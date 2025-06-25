@@ -31,7 +31,7 @@ struct SuggestionView: View {
     _ = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
     try? container.mainContext.save()
 
-    NavigationStack {
+    return NavigationStack {
         SuggestionView(plan: plan)
     }
     .modelContainer(container)
