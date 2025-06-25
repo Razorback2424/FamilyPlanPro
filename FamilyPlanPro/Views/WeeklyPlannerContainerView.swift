@@ -3,7 +3,7 @@ import SwiftData
 
 struct WeeklyPlannerContainerView: View {
     @Environment(\.modelContext) private var context
-    @Query(sort: [SortDescriptor(\.startDate, order: .reverse)]) private var plans: [WeeklyPlan]
+    @Query(sort: [SortDescriptor(\WeeklyPlan.startDate, order: .reverse)]) private var plans: [WeeklyPlan]
 
     private var currentPlan: WeeklyPlan? {
         let calendar = Calendar.current
