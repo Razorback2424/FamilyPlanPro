@@ -13,6 +13,11 @@ struct FamilyPlanProApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            MealSlot.self,
+            MealSuggestion.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
