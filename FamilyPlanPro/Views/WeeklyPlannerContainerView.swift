@@ -13,7 +13,14 @@ struct WeeklyPlannerContainerView: View {
     var body: some View {
         Group {
             if let plan = currentPlan {
-                Text("Current plan starting \(plan.startDate, format: Date.FormatStyle(date: .numeric, time: .omitted))")
+                switch plan.status {
+                case .suggestionMode:
+                    SuggestionView(plan: plan)
+                case .reviewMode:
+                    ReviewView()
+                case .finalized:
+                    FinalizedView()
+                }
             } else {
                 Text("Start New Week")
             }

@@ -26,7 +26,7 @@ final class DataManager {
 
     // MARK: - Plan
     func createWeeklyPlan(startDate: Date, for family: Family) -> WeeklyPlan {
-        let plan = WeeklyPlan(startDate: startDate, family: family)
+        let plan = WeeklyPlan(startDate: startDate, status: .suggestionMode, family: family)
         family.plans.append(plan)
         context.insert(plan)
         return plan
@@ -39,8 +39,8 @@ final class DataManager {
         return slot
     }
 
-    func addSuggestion(title: String, to slot: MealSlot) -> MealSuggestion {
-        let suggestion = MealSuggestion(title: title, slot: slot)
+    func addSuggestion(title: String, user: User? = nil, to slot: MealSlot) -> MealSuggestion {
+        let suggestion = MealSuggestion(title: title, user: user, slot: slot)
         slot.suggestions.append(suggestion)
         context.insert(suggestion)
         return suggestion
@@ -61,7 +61,7 @@ func createDummyData(context: ModelContext) {
 
     let plan = manager.createWeeklyPlan(startDate: .now, for: family)
     let mondayBreakfast = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-    _ = manager.addSuggestion(title: "Pancakes", to: mondayBreakfast)
+    _ = manager.addSuggestion(title: "Pancakes", user: family.users.first, to: mondayBreakfast)
 
     try? manager.save()
 }
