@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Observation
 
 struct FamilyDetailView: View {
     @Environment(\.modelContext) private var context
