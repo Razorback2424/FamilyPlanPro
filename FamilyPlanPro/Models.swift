@@ -25,12 +25,20 @@ final class User {
 
 @Model
 final class WeeklyPlan {
+    enum Status: String, Codable {
+        case suggestionMode
+        case reviewMode
+        case finalized
+    }
+
     var startDate: Date
+    var status: Status
     weak var family: Family?
     @Relationship(deleteRule: .cascade) var slots: [MealSlot] = []
 
-    init(startDate: Date, family: Family? = nil) {
+    init(startDate: Date, status: Status = .suggestionMode, family: Family? = nil) {
         self.startDate = startDate
+        self.status = status
         self.family = family
     }
 }
@@ -56,10 +64,12 @@ final class MealSlot {
 @Model
 final class MealSuggestion {
     var title: String
+    weak var user: User?
     weak var slot: MealSlot?
 
-    init(title: String, slot: MealSlot? = nil) {
+    init(title: String, user: User? = nil, slot: MealSlot? = nil) {
         self.title = title
+        self.user = user
         self.slot = slot
     }
 }
