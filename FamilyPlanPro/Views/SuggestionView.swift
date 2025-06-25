@@ -23,7 +23,7 @@ struct SuggestionView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(for: [Family.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
+    let container = try! ModelContainer(for: Family.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self, inMemory: true)
     let manager = DataManager(context: container.mainContext)
     let family = manager.createFamily(name: "Preview")
     _ = manager.addUser(name: "Alice", to: family)
@@ -31,7 +31,7 @@ struct SuggestionView: View {
     _ = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
     try? container.mainContext.save()
 
-    return NavigationStack {
+    NavigationStack {
         SuggestionView(plan: plan)
     }
     .modelContainer(container)
