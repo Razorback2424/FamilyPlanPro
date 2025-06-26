@@ -28,17 +28,23 @@ final class WeeklyPlan {
     enum Status: String, Codable {
         case suggestionMode
         case reviewMode
+        case conflict
         case finalized
     }
 
     var startDate: Date
     var status: Status
+    var lastModifiedByUserID: String?
     weak var family: Family?
     @Relationship(deleteRule: .cascade) var slots: [MealSlot] = []
 
-    init(startDate: Date, status: Status = .suggestionMode, family: Family? = nil) {
+    init(startDate: Date,
+         status: Status = .suggestionMode,
+         lastModifiedByUserID: String? = nil,
+         family: Family? = nil) {
         self.startDate = startDate
         self.status = status
+        self.lastModifiedByUserID = lastModifiedByUserID
         self.family = family
     }
 }
@@ -52,7 +58,8 @@ final class MealSlot {
     var date: Date
     var mealType: MealType
     weak var plan: WeeklyPlan?
-    @Relationship(deleteRule: .cascade) var suggestions: [MealSuggestion] = []
+    @Relationship(deleteRule: .cascade) var finalizedSuggestion: MealSuggestion?
+    @Relationship(deleteRule: .cascade) var pendingSuggestion: MealSuggestion?
 
     init(date: Date, mealType: MealType, plan: WeeklyPlan? = nil) {
         self.date = date

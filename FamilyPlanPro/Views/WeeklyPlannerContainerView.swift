@@ -17,7 +17,9 @@ struct WeeklyPlannerContainerView: View {
                 case .suggestionMode:
                     SuggestionView(plan: plan)
                 case .reviewMode:
-                    ReviewView()
+                    ReviewView(plan: plan)
+                case .conflict:
+                    ReviewView(plan: plan) // simplified
                 case .finalized:
                     FinalizedView()
                 }
@@ -32,6 +34,6 @@ struct WeeklyPlannerContainerView: View {
 struct WeeklyPlannerContainerView_Previews: PreviewProvider {
     static var previews: some View {
         WeeklyPlannerContainerView()
-            .modelContainer(for: [Family.self, WeeklyPlan.self], inMemory: true)
+            .modelContainer(for: [Family.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
     }
 }
