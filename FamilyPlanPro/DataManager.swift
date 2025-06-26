@@ -39,6 +39,21 @@ final class DataManager {
         return slot
     }
 
+    /// Creates a new weekly plan for the current week (Sunday-Saturday)
+    /// and pre-populates meal slots for each day and meal type.
+    func createCurrentWeekPlan(for family: Family) -> WeeklyPlan {
+        let start = Calendar.current.startOfWeek(for: .now)
+        let plan = createWeeklyPlan(startDate: start, for: family)
+        let calendar = Calendar.current
+        for dayOffset in 0..<7 {
+            let date = calendar.date(byAdding: .day, value: dayOffset, to: start)!
+            for meal in MealSlot.MealType.allCases {
+                _ = addMealSlot(date: date, type: meal, to: plan)
+            }
+        }
+        return plan
+    }
+
     func setPendingSuggestion(title: String, user: User? = nil, for slot: MealSlot) -> MealSuggestion {
         let suggestion = MealSuggestion(title: title, user: user, slot: slot)
         slot.pendingSuggestion = suggestion
