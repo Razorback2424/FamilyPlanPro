@@ -30,6 +30,22 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testPlannerDisplaysReviewView() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_STATUS"] = "reviewMode"
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Review"].exists)
+    }
+
+    @MainActor
+    func testPlannerDisplaysFinalizedView() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Finalized"].exists)
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

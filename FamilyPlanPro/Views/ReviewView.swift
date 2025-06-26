@@ -24,8 +24,10 @@ struct ReviewView: View {
                             .buttonStyle(.bordered)
                             Button("Reject") {
                                 let manager = DataManager(context: context)
-                                _ = manager.rejectPendingSuggestion(in: slot, newTitle: pending.title, by: plan.family?.users.last)
-                                plan.lastModifiedByUserID = plan.family?.users.last?.name
+                                _ = manager.rejectPendingSuggestion(in: slot,
+                                                                   newTitle: pending.title,
+                                                                   by: plan.family?.users.last,
+                                                                   in: plan)
                                 try? context.save()
                             }
                             .buttonStyle(.borderedProminent)
