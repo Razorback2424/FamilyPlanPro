@@ -7,6 +7,8 @@ struct FinalizedView: View {
     }
 }
 
-#Preview {
-    FinalizedView()
+struct FinalizedView_Previews: PreviewProvider {
+    static var previews: some View {
+        FinalizedView()
+    }
 }

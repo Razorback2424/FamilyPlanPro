@@ -29,7 +29,9 @@ struct WeeklyPlannerContainerView: View {
     }
 }
 
-#Preview {
-    WeeklyPlannerContainerView()
-        .modelContainer(for: [Family.self, WeeklyPlan.self], inMemory: true)
+struct WeeklyPlannerContainerView_Previews: PreviewProvider {
+    static var previews: some View {
+        WeeklyPlannerContainerView()
+            .modelContainer(for: [Family.self, WeeklyPlan.self], inMemory: true)
+    }
 }
