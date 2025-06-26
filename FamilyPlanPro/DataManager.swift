@@ -39,11 +39,37 @@ final class DataManager {
         return slot
     }
 
-    func addSuggestion(title: String, user: User? = nil, to slot: MealSlot) -> MealSuggestion {
+    func setPendingSuggestion(title: String, user: User? = nil, for slot: MealSlot) -> MealSuggestion {
         let suggestion = MealSuggestion(title: title, user: user, slot: slot)
-        slot.suggestions.append(suggestion)
+        slot.pendingSuggestion = suggestion
         context.insert(suggestion)
         return suggestion
+    }
+
+    func acceptPendingSuggestion(in slot: MealSlot) {
+        if let pending = slot.pendingSuggestion {
+            slot.finalizedSuggestion = pending
+            slot.pendingSuggestion = nil
+        }
+    }
+
+    func rejectPendingSuggestion(in slot: MealSlot, newTitle: String, by user: User?) -> MealSuggestion {
+        let suggestion = MealSuggestion(title: newTitle, user: user, slot: slot)
+        slot.pendingSuggestion = suggestion
+        context.insert(suggestion)
+        return suggestion
+    }
+
+    func submitPlanForReview(_ plan: WeeklyPlan, by user: User) {
+        plan.status = .reviewMode
+        plan.lastModifiedByUserID = user.name
+    }
+
+    func finalizeIfPossible(_ plan: WeeklyPlan) {
+        let pendingSlots = plan.slots.filter { $0.pendingSuggestion != nil }
+        if pendingSlots.isEmpty {
+            plan.status = .finalized
+        }
     }
 
     // Persist changes
@@ -61,7 +87,7 @@ func createDummyData(context: ModelContext) {
 
     let plan = manager.createWeeklyPlan(startDate: .now, for: family)
     let mondayBreakfast = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-    _ = manager.addSuggestion(title: "Pancakes", user: family.users.first, to: mondayBreakfast)
+    _ = manager.setPendingSuggestion(title: "Pancakes", user: family.users.first, for: mondayBreakfast)
 
     try? manager.save()
 }

@@ -15,8 +15,11 @@ struct SuggestionView: View {
         .navigationTitle("Suggestions")
         .toolbar {
             Button("Submit for Review") {
-                plan.status = .reviewMode
-                try? context.save()
+                if let user = plan.family?.users.first { // naive current user
+                    let manager = DataManager(context: context)
+                    manager.submitPlanForReview(plan, by: user)
+                    try? context.save()
+                }
             }
         }
     }

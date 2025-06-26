@@ -26,7 +26,7 @@ struct MealSlotEntryView: View {
             Button("Add Suggestion") {
                 guard !title.isEmpty else { return }
                 let manager = DataManager(context: context)
-                _ = manager.addSuggestion(title: title, user: selectedUser, to: slot)
+                _ = manager.setPendingSuggestion(title: title, user: selectedUser, for: slot)
                 try? context.save()
                 title = ""
                 selectedUser = nil
