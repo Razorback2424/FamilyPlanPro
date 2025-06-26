@@ -23,7 +23,14 @@ struct SuggestionView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(for: Family.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self, inMemory: true)
+    let schema = Schema([
+        Family.self,
+        WeeklyPlan.self,
+        MealSlot.self,
+        MealSuggestion.self,
+    ])
+    let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: schema, configurations: [config])
     let manager = DataManager(context: container.mainContext)
     let family = manager.createFamily(name: "Preview")
     _ = manager.addUser(name: "Alice", to: family)
