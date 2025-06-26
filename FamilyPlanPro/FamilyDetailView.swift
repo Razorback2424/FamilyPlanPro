@@ -16,7 +16,9 @@ struct FamilyDetailView: View {
     }
 }
 
-#Preview {
-    FamilyDetailView(family: Family(name: "Preview"))
-        .modelContainer(for: Family.self, inMemory: true)
+struct FamilyDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        FamilyDetailView(family: Family(name: "Preview"))
+            .modelContainer(for: Family.self, inMemory: true)
+    }
 }

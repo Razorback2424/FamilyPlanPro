@@ -7,6 +7,8 @@ struct ReviewView: View {
     }
 }
 
-#Preview {
-    ReviewView()
+struct ReviewView_Previews: PreviewProvider {
+    static var previews: some View {
+        ReviewView()
+    }
 }
