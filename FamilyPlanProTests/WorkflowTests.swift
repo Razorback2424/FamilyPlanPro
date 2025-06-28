@@ -85,4 +85,17 @@ final class WorkflowTests: XCTestCase {
         XCTAssertEqual(plan.status, .conflict)
         XCTAssertEqual(plan.lastModifiedByUserID, userA.name)
     }
+
+    func testCurrentPlanLookup() throws {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 1
+        let startOfWeek = calendar.startOfWeek(for: Date())
+        let plan = WeeklyPlan(startDate: startOfWeek)
+        let plans = [plan]
+
+        calendar.firstWeekday = 1
+        let startOfThisWeek = calendar.startOfWeek(for: Date())
+        let found = plans.first { calendar.isDate($0.startDate, equalTo: startOfThisWeek, toGranularity: .day) }
+        XCTAssertNotNil(found)
+    }
 }

@@ -7,8 +7,10 @@ struct WeeklyPlannerContainerView: View {
     @Query private var families: [Family]
 
     private var currentPlan: WeeklyPlan? {
-        let calendar = Calendar.current
-        return plans.first { calendar.isDate($0.startDate, equalTo: Date(), toGranularity: .weekOfYear) }
+        var calendar = Calendar.current
+        calendar.firstWeekday = 1 // Sunday to match startOfWeek(for:)
+        let startOfThisWeek = calendar.startOfWeek(for: Date())
+        return plans.first { calendar.isDate($0.startDate, equalTo: startOfThisWeek, toGranularity: .day) }
     }
 
     var body: some View {
