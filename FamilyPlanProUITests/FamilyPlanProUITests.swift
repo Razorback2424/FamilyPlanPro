@@ -25,6 +25,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testPlannerDisplaysSuggestionView() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_STATUS"] = "suggestionMode"
         app.launch()
         XCTAssertTrue(app.navigationBars["Suggestions"].exists)
     }
@@ -43,6 +44,13 @@ final class FamilyPlanProUITests: XCTestCase {
         app.launchEnvironment["UITEST_STATUS"] = "finalized"
         app.launch()
         XCTAssertTrue(app.navigationBars["Finalized"].exists)
+    }
+
+    @MainActor
+    func testShowsAddFamilyViewWhenEmpty() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Create a Family"].exists)
     }
 
     @MainActor
