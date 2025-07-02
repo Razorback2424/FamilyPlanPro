@@ -15,7 +15,9 @@ struct WeeklyPlannerContainerView: View {
 
     var body: some View {
         Group {
-            if let plan = currentPlan {
+            if families.isEmpty {
+                AddFamilyView()
+            } else if let plan = currentPlan {
                 switch plan.status {
                 case .suggestionMode:
                     SuggestionView(plan: plan)
