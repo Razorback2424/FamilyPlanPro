@@ -2,11 +2,13 @@ import SwiftUI
 
 struct MainTabView: View {
     var body: some View {
-        TabView {
-            WeeklyPlannerContainerView()
-                .tabItem {
-                    Label("Planner", systemImage: "calendar")
-                }
+        NavigationStack {
+            TabView {
+                WeeklyPlannerContainerView()
+                    .tabItem {
+                        Label("Planner", systemImage: "calendar")
+                    }
+            }
         }
     }
 }
