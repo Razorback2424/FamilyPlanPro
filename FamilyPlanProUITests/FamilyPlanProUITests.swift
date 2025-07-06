@@ -54,6 +54,19 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testCreateFamilyGeneratesPlan() throws {
+        let app = XCUIApplication()
+        app.launch()
+        let field = app.textFields["Family Name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 1))
+        field.tap()
+        field.typeText("Test")
+        app.buttons["Create"].tap()
+        let suggestions = app.navigationBars["Suggestions"]
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
