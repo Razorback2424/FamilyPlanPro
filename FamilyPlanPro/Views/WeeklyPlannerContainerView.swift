@@ -5,6 +5,7 @@ struct WeeklyPlannerContainerView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: [SortDescriptor(\WeeklyPlan.startDate, order: .reverse)]) private var plans: [WeeklyPlan]
     @Query private var families: [Family]
+    @State private var showingAddFamily = false
 
     private var currentPlan: WeeklyPlan? {
         var calendar = Calendar.current
@@ -33,7 +34,17 @@ struct WeeklyPlannerContainerView: View {
             }
         }
         .navigationTitle("Weekly Planner")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showingAddFamily = true }) {
+                    Label("New Family", systemImage: "plus")
+                }
+            }
+        }
         .onAppear(perform: createWeekIfNeeded)
+        .sheet(isPresented: $showingAddFamily) {
+            NavigationStack { AddFamilyView() }
+        }
     }
 
     private func createWeekIfNeeded() {
