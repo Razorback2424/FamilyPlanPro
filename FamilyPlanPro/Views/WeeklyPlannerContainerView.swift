@@ -42,6 +42,9 @@ struct WeeklyPlannerContainerView: View {
             }
         }
         .onAppear(perform: createWeekIfNeeded)
+        .onChange(of: families.count) { _, _ in
+            createWeekIfNeeded()
+        }
         .sheet(isPresented: $showingAddFamily) {
             NavigationStack { AddFamilyView() }
         }
