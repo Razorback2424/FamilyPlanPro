@@ -71,11 +71,13 @@ final class MealSlot {
 @Model
 final class MealSuggestion {
     var title: String
+    var reason: String?
     weak var user: User?
     weak var slot: MealSlot?
 
-    init(title: String, user: User? = nil, slot: MealSlot? = nil) {
+    init(title: String, user: User? = nil, slot: MealSlot? = nil, reason: String? = nil) {
         self.title = title
+        self.reason = reason
         self.user = user
         self.slot = slot
     }

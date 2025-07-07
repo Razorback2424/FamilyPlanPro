@@ -52,7 +52,7 @@ final class WorkflowTests: XCTestCase {
         try manager.save()
 
         manager.submitPlanForReview(plan, by: userA)
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, reason: nil, in: plan)
 
         XCTAssertEqual(plan.status, .reviewMode)
         XCTAssertEqual(plan.lastModifiedByUserID, userB.name)
@@ -78,9 +78,9 @@ final class WorkflowTests: XCTestCase {
         try manager.save()
 
         manager.submitPlanForReview(plan, by: userA)
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, reason: nil, in: plan)
 
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Cereal", by: userA, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Cereal", by: userA, reason: nil, in: plan)
 
         XCTAssertEqual(plan.status, .conflict)
         XCTAssertEqual(plan.lastModifiedByUserID, userA.name)

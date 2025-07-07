@@ -71,6 +71,7 @@ final class DataManager {
     func rejectPendingSuggestion(in slot: MealSlot,
                                  newTitle: String,
                                  by user: User?,
+                                 reason: String? = nil,
                                  in plan: WeeklyPlan) -> MealSuggestion {
         if let lastUserID = plan.lastModifiedByUserID,
            let rejectingUser = user,
@@ -78,7 +79,10 @@ final class DataManager {
             plan.status = .conflict
         }
 
-        let suggestion = MealSuggestion(title: newTitle, user: user, slot: slot)
+        let suggestion = MealSuggestion(title: newTitle,
+                                        user: user,
+                                        slot: slot,
+                                        reason: reason)
         slot.pendingSuggestion = suggestion
         plan.lastModifiedByUserID = user?.name
         context.insert(suggestion)
