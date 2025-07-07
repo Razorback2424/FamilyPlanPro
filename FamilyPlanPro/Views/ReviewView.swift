@@ -9,30 +9,8 @@ struct ReviewView: View {
     var body: some View {
         List {
             ForEach(plan.slots) { slot in
-                if let pending = slot.pendingSuggestion {
-                    VStack(alignment: .leading) {
-                        Text("\(slot.date, format: Date.FormatStyle(date: .numeric, time: .omitted)) \(slot.mealType.rawValue.capitalized)")
-                            .font(.headline)
-                        Text(pending.title)
-                        HStack {
-                            Button("Accept") {
-                                let manager = DataManager(context: context)
-                                manager.acceptPendingSuggestion(in: slot)
-                                manager.finalizeIfPossible(plan)
-                                try? context.save()
-                            }
-                            .buttonStyle(.bordered)
-                            Button("Reject") {
-                                let manager = DataManager(context: context)
-                                _ = manager.rejectPendingSuggestion(in: slot,
-                                                                   newTitle: pending.title,
-                                                                   by: plan.family?.users.last,
-                                                                   in: plan)
-                                try? context.save()
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                    }
+                if slot.pendingSuggestion != nil {
+                    MealSlotReviewView(slot: slot, plan: plan, users: plan.family?.users ?? [])
                 }
             }
         }

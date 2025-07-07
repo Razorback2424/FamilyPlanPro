@@ -59,8 +59,8 @@ struct FamilyPlanProApp: App {
             manager.finalizeIfPossible(plan)
         case .conflict:
             manager.submitPlanForReview(plan, by: userA)
-            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt", by: userB, in: plan)
-            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt2", by: userA, in: plan)
+            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt", by: userB, reason: nil, in: plan)
+            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt2", by: userA, reason: nil, in: plan)
         case .suggestionMode:
             break
         }
