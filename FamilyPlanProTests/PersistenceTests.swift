@@ -79,4 +79,37 @@ final class PersistenceTests: XCTestCase {
 
         try? FileManager.default.removeItem(at: directory)
     }
+
+    func testFamilySettingsPersistEditsAndMembershipChanges() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+        ])
+
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("FamilySettings-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Store.sqlite")
+        var config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        config.url = url
+
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Original")
+        let alice = manager.addUser(name: "Alice", to: family)
+        try manager.save()
+
+        family.name = "Updated Family"
+        _ = manager.addUser(name: "Bob", to: family)
+        container.mainContext.delete(alice)
+        try container.mainContext.save()
+
+        let container2 = try ModelContainer(for: schema, configurations: [config])
+        let fetchedFamilies = try container2.mainContext.fetch(FetchDescriptor<Family>())
+
+        XCTAssertEqual(fetchedFamilies.count, 1)
+        XCTAssertEqual(fetchedFamilies.first?.name, "Updated Family")
+        XCTAssertEqual(fetchedFamilies.first?.members.count, 1)
+        XCTAssertEqual(fetchedFamilies.first?.members.first?.name, "Bob")
+    }
 }
