@@ -67,6 +67,7 @@ final class WeeklyPlan {
     var startDate: Date
     var status: PlanStatus
     var lastModifiedByUserID: UUID?
+    var reviewInitiatorUserID: UUID?
     weak var family: Family?
     @Relationship(deleteRule: .cascade) var mealSlots: [MealSlot] = []
 
@@ -74,11 +75,13 @@ final class WeeklyPlan {
          startDate: Date,
          status: PlanStatus = .suggestionMode,
          lastModifiedByUserID: UUID? = nil,
+         reviewInitiatorUserID: UUID? = nil,
          family: Family? = nil) {
         self.id = id
         self.startDate = startDate
         self.status = status
         self.lastModifiedByUserID = lastModifiedByUserID
+        self.reviewInitiatorUserID = reviewInitiatorUserID
         self.family = family
     }
 }

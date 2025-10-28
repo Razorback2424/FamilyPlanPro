@@ -95,10 +95,24 @@ final class DataManager {
                                  responsibleUser: User?,
                                  reasonForChange: String? = nil,
                                  in plan: WeeklyPlan) -> MealSuggestion {
-        if let lastUserID = plan.lastModifiedByUserID,
-           let rejectingUser = author,
-           lastUserID != rejectingUser.id {
+        let previousModifierID = plan.lastModifiedByUserID
+        let rejectingUserID = author?.id
+
+        var shouldEnterConflict = false
+        if let lastUserID = previousModifierID,
+           let rejectingUserID,
+           lastUserID != rejectingUserID {
+            if let initiatorID = plan.reviewInitiatorUserID {
+                shouldEnterConflict = lastUserID != initiatorID
+            } else {
+                shouldEnterConflict = true
+            }
+        }
+
+        if shouldEnterConflict {
             plan.status = .conflict
+        } else if plan.status != .conflict {
+            plan.status = .reviewMode
         }
 
         let suggestion = MealSuggestion(mealName: newMealName,
@@ -114,12 +128,15 @@ final class DataManager {
 
     func submitPlanForReview(_ plan: WeeklyPlan, by user: User) {
         plan.status = .reviewMode
+        plan.reviewInitiatorUserID = user.id
         plan.lastModifiedByUserID = user.id
     }
 
     func finalizeIfPossible(_ plan: WeeklyPlan) {
-        let pendingSlots = plan.mealSlots.filter { $0.pendingSuggestion != nil }
-        if pendingSlots.isEmpty {
+        let allSlotsFinalized = plan.mealSlots.allSatisfy { slot in
+            slot.pendingSuggestion == nil && slot.finalizedSuggestion != nil
+        }
+        if allSlotsFinalized {
             plan.status = .finalized
         }
     }
