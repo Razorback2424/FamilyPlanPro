@@ -48,6 +48,25 @@ final class FamilyPlanProUITests: XCTestCase {
         app.launchEnvironment["UITEST_STATUS"] = "finalized"
         app.launch()
         XCTAssertTrue(app.navigationBars["Finalized"].exists)
+        XCTAssertTrue(app.staticTexts["Every meal for the week has been finalized. Here's the summary."].exists)
+        XCTAssertTrue(app.staticTexts["Test"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testAcceptingAllSlotsDisplaysFinalizedSummary() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "reviewMode"
+        app.launch()
+
+        let acceptButton = app.buttons["Accept"].firstMatch
+        XCTAssertTrue(acceptButton.waitForExistence(timeout: 2))
+        acceptButton.tap()
+
+        let finalizedNavigationBar = app.navigationBars["Finalized"]
+        XCTAssertTrue(finalizedNavigationBar.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Test"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Responsible: Alice"].waitForExistence(timeout: 2))
     }
 
     @MainActor

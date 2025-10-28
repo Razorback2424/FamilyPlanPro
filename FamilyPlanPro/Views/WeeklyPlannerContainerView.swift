@@ -28,7 +28,7 @@ struct WeeklyPlannerContainerView: View {
                 case .conflict:
                     ConflictView(plan: plan)
                 case .finalized:
-                    FinalizedView()
+                    FinalizedView(plan: plan)
                 }
             } else {
                 VStack(spacing: 16) {
