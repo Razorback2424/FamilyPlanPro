@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Foundation
 
 @main
 struct FamilyPlanProApp: App {
@@ -19,12 +20,38 @@ struct FamilyPlanProApp: App {
             MealSlot.self,
             MealSuggestion.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        let fileManager = FileManager.default
+        let storeURL = URL.applicationSupportDirectory.appendingPathComponent("FamilyPlanPro.sqlite")
+        do {
+            try fileManager.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        } catch {
+            assertionFailure("Unable to create application support directory: \(error)")
+        }
+
+        let configuration = ModelConfiguration(url: storeURL, schema: schema, isStoredInMemoryOnly: false)
+
+        func makeContainer() throws -> ModelContainer {
+            try ModelContainer(for: schema, configurations: [configuration])
+        }
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try makeContainer()
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // If a migration or schema mismatch prevents loading the store, wipe and recreate it.
+            if fileManager.fileExists(atPath: storeURL.path) {
+                try? fileManager.removeItem(at: storeURL)
+                let shmURL = URL(fileURLWithPath: storeURL.path + "-shm")
+                let walURL = URL(fileURLWithPath: storeURL.path + "-wal")
+                try? fileManager.removeItem(at: shmURL)
+                try? fileManager.removeItem(at: walURL)
+            }
+
+            do {
+                return try makeContainer()
+            } catch {
+                fatalError("Could not create ModelContainer even after resetting the store: \(error)")
+            }
         }
     }()
 
