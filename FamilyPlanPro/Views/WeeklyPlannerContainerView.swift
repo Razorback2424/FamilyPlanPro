@@ -19,9 +19,10 @@ struct WeeklyPlannerContainerView: View {
             if families.isEmpty {
                 AddFamilyView()
             } else if let plan = currentPlan {
+                let currentUser = plan.family?.members.first
                 switch plan.status {
                 case .suggestionMode:
-                    SuggestionView(plan: plan)
+                    SuggestionView(plan: plan, currentUser: currentUser)
                 case .reviewMode:
                     ReviewView(plan: plan)
                 case .conflict:

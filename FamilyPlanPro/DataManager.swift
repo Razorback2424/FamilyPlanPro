@@ -44,11 +44,26 @@ final class DataManager {
     func createCurrentWeekPlan(for family: Family) -> WeeklyPlan {
         let start = Calendar.current.startOfWeek(for: .now)
         let plan = createWeeklyPlan(startDate: start, for: family)
+
         for day in DayOfWeek.allCases {
             for meal in MealType.allCases {
-                _ = addMealSlot(dayOfWeek: day, mealType: meal, to: plan)
+                if !plan.mealSlots.contains(where: { $0.dayOfWeek == day && $0.mealType == meal }) {
+                    _ = addMealSlot(dayOfWeek: day, mealType: meal, to: plan)
+                }
             }
         }
+
+        plan.mealSlots.sort { lhs, rhs in
+            if lhs.dayOfWeek.rawValue != rhs.dayOfWeek.rawValue {
+                return lhs.dayOfWeek.rawValue < rhs.dayOfWeek.rawValue
+            }
+
+            let mealOrder = MealType.allCases
+            let lhsIndex = mealOrder.firstIndex(of: lhs.mealType) ?? 0
+            let rhsIndex = mealOrder.firstIndex(of: rhs.mealType) ?? 0
+            return lhsIndex < rhsIndex
+        }
+
         return plan
     }
 

@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import Foundation
 
 final class FamilyPlanProUITests: XCTestCase {
 
@@ -25,6 +26,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testPlannerDisplaysSuggestionView() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_STATUS"] = "suggestionMode"
         app.launch()
         XCTAssertTrue(app.navigationBars["Suggestions"].exists)
@@ -33,6 +35,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testPlannerDisplaysReviewView() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_STATUS"] = "reviewMode"
         app.launch()
         XCTAssertTrue(app.navigationBars["Review"].exists)
@@ -41,6 +44,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testPlannerDisplaysFinalizedView() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_STATUS"] = "finalized"
         app.launch()
         XCTAssertTrue(app.navigationBars["Finalized"].exists)
@@ -49,6 +53,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testShowsAddFamilyViewWhenEmpty() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launch()
         XCTAssertTrue(app.staticTexts["Create a Family"].exists)
     }
@@ -56,6 +61,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testCreateFamilyGeneratesPlan() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launch()
         let field = app.textFields["Family Name"]
         XCTAssertTrue(field.waitForExistence(timeout: 1))
@@ -69,6 +75,7 @@ final class FamilyPlanProUITests: XCTestCase {
     @MainActor
     func testStartNewWeekButtonCreatesPlan() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
         app.launch()
 
@@ -78,6 +85,48 @@ final class FamilyPlanProUITests: XCTestCase {
 
         let suggestions = app.navigationBars["Suggestions"]
         XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testSuggestionsPersistAndSubmitTransitionsToReview() throws {
+        let mealName = "Tacos \(Int(Date().timeIntervalSince1970))"
+
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
+        app.launch()
+
+        let startButton = app.buttons["Start New Week"]
+        if startButton.waitForExistence(timeout: 2) {
+            startButton.tap()
+        }
+
+        let mealField = app.textFields["Meal name"].firstMatch
+        XCTAssertTrue(mealField.waitForExistence(timeout: 2))
+        mealField.tap()
+        mealField.typeText(mealName)
+
+        let saveButton = app.buttons["Save Suggestion"].firstMatch
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        let suggestionLabelIdentifier = "Suggested: \(mealName)"
+        XCTAssertTrue(app.staticTexts[suggestionLabelIdentifier].waitForExistence(timeout: 2))
+
+        app.terminate()
+
+        let relaunch = XCUIApplication()
+        relaunch.launchEnvironment["UITEST_RESET"] = "0"
+        relaunch.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
+        relaunch.launch()
+
+        XCTAssertTrue(relaunch.staticTexts[suggestionLabelIdentifier].waitForExistence(timeout: 2))
+
+        let submitButton = relaunch.buttons["Submit for Review"]
+        XCTAssertTrue(submitButton.waitForExistence(timeout: 2))
+        submitButton.tap()
+
+        XCTAssertTrue(relaunch.navigationBars["Review"].waitForExistence(timeout: 2))
     }
 
     @MainActor
