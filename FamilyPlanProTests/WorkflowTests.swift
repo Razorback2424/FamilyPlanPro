@@ -31,6 +31,7 @@ final class WorkflowTests: XCTestCase {
         manager.submitPlanForReview(plan, by: userA)
         XCTAssertEqual(plan.status, .reviewMode)
         XCTAssertEqual(plan.lastModifiedByUserID, userA.id)
+        XCTAssertEqual(plan.reviewInitiatorUserID, userA.id)
 
         manager.acceptPendingSuggestion(in: slot)
         manager.finalizeIfPossible(plan)
@@ -71,6 +72,7 @@ final class WorkflowTests: XCTestCase {
 
         XCTAssertEqual(plan.status, .reviewMode)
         XCTAssertEqual(plan.lastModifiedByUserID, userB.id)
+        XCTAssertEqual(plan.reviewInitiatorUserID, userA.id)
         XCTAssertEqual(slot.pendingSuggestion?.authorUserID, userB.id)
         XCTAssertEqual(slot.pendingSuggestion?.responsibleUserID, userB.id)
     }
@@ -114,8 +116,47 @@ final class WorkflowTests: XCTestCase {
 
         XCTAssertEqual(plan.status, .conflict)
         XCTAssertEqual(plan.lastModifiedByUserID, userA.id)
+        XCTAssertEqual(plan.reviewInitiatorUserID, userA.id)
         XCTAssertEqual(slot.pendingSuggestion?.authorUserID, userA.id)
         XCTAssertEqual(slot.pendingSuggestion?.responsibleUserID, userA.id)
+    }
+
+    func testFinalizeRequiresAllSlots() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            MealSlot.self,
+            MealSuggestion.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+        let breakfast = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        let dinner = manager.addMealSlot(dayOfWeek: .monday, mealType: .dinner, to: plan)
+
+        _ = manager.setPendingSuggestion(mealName: "Toast",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: breakfast)
+        _ = manager.setPendingSuggestion(mealName: "Pasta",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: dinner)
+
+        manager.submitPlanForReview(plan, by: userA)
+        manager.acceptPendingSuggestion(in: breakfast)
+        manager.finalizeIfPossible(plan)
+
+        XCTAssertEqual(plan.status, .reviewMode)
+
+        manager.acceptPendingSuggestion(in: dinner)
+        manager.finalizeIfPossible(plan)
+
+        XCTAssertEqual(plan.status, .finalized)
     }
 
     func testCurrentPlanLookup() throws {
