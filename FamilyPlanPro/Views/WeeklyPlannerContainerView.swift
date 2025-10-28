@@ -26,7 +26,7 @@ struct WeeklyPlannerContainerView: View {
                 case .reviewMode:
                     ReviewView(plan: plan)
                 case .conflict:
-                    ReviewView(plan: plan) // simplified
+                    ConflictView(plan: plan)
                 case .finalized:
                     FinalizedView()
                 }
