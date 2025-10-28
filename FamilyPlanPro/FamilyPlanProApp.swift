@@ -33,6 +33,9 @@ struct FamilyPlanProApp: App {
             MainTabView()
                 .onAppear {
                     let environment = ProcessInfo.processInfo.environment
+                    if environment["UITEST_RESET"] == "1" {
+                        resetData()
+                    }
                     if environment["UITEST_EMPTY_STATE"] == "1" {
                         seedEmptyStateData()
                     } else if let statusString = environment["UITEST_STATUS"],
@@ -42,6 +45,14 @@ struct FamilyPlanProApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    private func resetData() {
+        let context = sharedModelContainer.mainContext
+        if let families = try? context.fetch(FetchDescriptor<Family>()) {
+            families.forEach { context.delete($0) }
+            try? context.save()
+        }
     }
 
     private func seedData(for status: PlanStatus) {

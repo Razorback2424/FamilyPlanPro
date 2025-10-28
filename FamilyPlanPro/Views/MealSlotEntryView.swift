@@ -6,41 +6,111 @@ struct MealSlotEntryView: View {
     @Environment(\.modelContext) private var context
     @Bindable var slot: MealSlot
     var members: [User]
+    var currentUser: User?
 
-    @State private var title: String = ""
-    @State private var selectedResponsible: User?
+    @State private var mealName: String
+    @State private var selectedResponsibleID: UUID?
 
-    private var author: User? {
-        slot.plan?.family?.members.first
+    init(slot: MealSlot, members: [User], currentUser: User?) {
+        self._slot = Bindable(wrappedValue: slot)
+        self.members = members
+        self.currentUser = currentUser
+        _mealName = State(initialValue: slot.pendingSuggestion?.mealName ?? "")
+        _selectedResponsibleID = State(initialValue: slot.pendingSuggestion?.responsibleUserID ?? currentUser?.id)
+    }
+
+    private var pendingSuggestion: MealSuggestion? {
+        slot.pendingSuggestion
+    }
+
+    private var buttonTitle: String {
+        pendingSuggestion == nil ? "Save Suggestion" : "Update Suggestion"
+    }
+
+    private func syncStateWithSlot() {
+        if let suggestion = slot.pendingSuggestion {
+            mealName = suggestion.mealName
+            selectedResponsibleID = suggestion.responsibleUserID
+        } else {
+            mealName = ""
+            selectedResponsibleID = currentUser?.id
+        }
+    }
+
+    private func saveSuggestion() {
+        let trimmedName = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        let responsibleUser = members.first { $0.id == selectedResponsibleID }
+        if let suggestion = slot.pendingSuggestion {
+            suggestion.mealName = trimmedName
+            suggestion.responsibleUserID = responsibleUser?.id
+            suggestion.authorUserID = currentUser?.id ?? suggestion.authorUserID
+        } else {
+            let manager = DataManager(context: context)
+            _ = manager.setPendingSuggestion(mealName: trimmedName,
+                                             responsibleUser: responsibleUser,
+                                             author: currentUser,
+                                             for: slot)
+        }
+        slot.plan?.lastModifiedByUserID = currentUser?.id
+        try? context.save()
+        syncStateWithSlot()
+    }
+
+    private func clearSuggestion() {
+        if let suggestion = slot.pendingSuggestion {
+            context.delete(suggestion)
+        }
+        slot.pendingSuggestion = nil
+        slot.plan?.lastModifiedByUserID = currentUser?.id
+        mealName = ""
+        selectedResponsibleID = currentUser?.id
+        try? context.save()
+        syncStateWithSlot()
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
-                .font(.headline)
-            TextField("Meal name", text: $title)
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Meal name", text: $mealName)
                 .textFieldStyle(.roundedBorder)
-            Picker("Responsible", selection: $selectedResponsible) {
-                Text("Unassigned").tag(Optional<User>(nil))
+
+            Picker("Responsible", selection: Binding(get: {
+                selectedResponsibleID
+            }, set: { newValue in
+                selectedResponsibleID = newValue
+            })) {
+                Text("Unassigned").tag(UUID?.none)
                 ForEach(members) { user in
-                    Text(user.name).tag(Optional(user))
+                    Text(user.name).tag(UUID?.some(user.id))
                 }
             }
             .pickerStyle(.menu)
-            Button("Add Suggestion") {
-                guard !title.isEmpty else { return }
-                let manager = DataManager(context: context)
-                _ = manager.setPendingSuggestion(mealName: title,
-                                                 responsibleUser: selectedResponsible,
-                                                 author: author,
-                                                 for: slot)
-                try? context.save()
-                title = ""
-                selectedResponsible = nil
+
+            HStack {
+                Button(buttonTitle) {
+                    saveSuggestion()
+                }
+                .buttonStyle(.borderedProminent)
+
+                if pendingSuggestion != nil {
+                    Button("Clear Suggestion") {
+                        clearSuggestion()
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
-            .buttonStyle(.borderedProminent)
         }
-        .padding(.vertical)
+        .onChange(of: slot.pendingSuggestion?.mealName) { _ in
+            syncStateWithSlot()
+        }
+        .onChange(of: slot.pendingSuggestion?.responsibleUserID) { _ in
+            syncStateWithSlot()
+        }
+        .onAppear {
+            syncStateWithSlot()
+        }
+        .accessibilityIdentifier("slot-entry-\(slot.id.uuidString)")
     }
 }
 
@@ -62,7 +132,7 @@ struct MealSlotEntryView_Previews: PreviewProvider {
         let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
         try? container.mainContext.save()
 
-        return MealSlotEntryView(slot: slot, members: family.members)
+        return MealSlotEntryView(slot: slot, members: family.members, currentUser: family.members.first)
             .modelContainer(container)
     }
 }

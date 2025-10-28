@@ -5,22 +5,83 @@ import Observation
 struct SuggestionView: View {
     @Environment(\.modelContext) private var context
     @Bindable var plan: WeeklyPlan
+    var currentUser: User?
+
+    private var members: [User] {
+        plan.family?.members ?? []
+    }
+
+    private var daySections: [(day: DayOfWeek, slots: [MealSlot])]? {
+        guard !plan.mealSlots.isEmpty else { return nil }
+
+        let orderedMeals = MealType.allCases
+        let sections: [(DayOfWeek, [MealSlot])] = DayOfWeek.allCases.compactMap { day in
+            let slotsForDay = plan.mealSlots
+                .filter { $0.dayOfWeek == day }
+                .sorted { lhs, rhs in
+                    let lhsIndex = orderedMeals.firstIndex(of: lhs.mealType) ?? 0
+                    let rhsIndex = orderedMeals.firstIndex(of: rhs.mealType) ?? 0
+                    return lhsIndex < rhsIndex
+                }
+            guard !slotsForDay.isEmpty else { return nil }
+            return (day, slotsForDay)
+        }
+
+        return sections.isEmpty ? nil : sections
+    }
 
     var body: some View {
         List {
-            ForEach(plan.mealSlots) { slot in
-                MealSlotEntryView(slot: slot, members: plan.family?.members ?? [])
+            if let sections = daySections {
+                ForEach(sections, id: \.day.rawValue) { section in
+                    Section(section.day.localizedName) {
+                        ForEach(section.slots) { slot in
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text(slot.mealType.displayName)
+                                        .font(.headline)
+                                    Spacer()
+                                    if let suggestion = slot.pendingSuggestion {
+                                        Text("Suggested: \(suggestion.mealName)")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .accessibilityIdentifier("suggestion-title-\(slot.id.uuidString)")
+                                    } else {
+                                        Text("No suggestion yet")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+
+                                if let suggestion = slot.pendingSuggestion {
+                                    let responsibleName = members.first(where: { $0.id == suggestion.responsibleUserID })?.name
+                                    Text("Responsible: \(responsibleName ?? "Unassigned")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                MealSlotEntryView(slot: slot,
+                                                  members: members,
+                                                  currentUser: currentUser)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                    }
+                }
+            } else {
+                Text("No meal slots available.")
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Suggestions")
         .toolbar {
             Button("Submit for Review") {
-                if let user = plan.family?.members.first { // naive current user
-                    let manager = DataManager(context: context)
-                    manager.submitPlanForReview(plan, by: user)
-                    try? context.save()
-                }
+                guard let user = currentUser else { return }
+                let manager = DataManager(context: context)
+                manager.submitPlanForReview(plan, by: user)
+                try? context.save()
             }
+            .disabled(currentUser == nil)
         }
     }
 }
@@ -44,7 +105,7 @@ struct SuggestionView_Previews: PreviewProvider {
         try? container.mainContext.save()
 
         return NavigationStack {
-            SuggestionView(plan: plan)
+            SuggestionView(plan: plan, currentUser: family.members.first)
         }
         .modelContainer(container)
     }
