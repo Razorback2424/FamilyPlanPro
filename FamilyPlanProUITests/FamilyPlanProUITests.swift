@@ -67,6 +67,20 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testStartNewWeekButtonCreatesPlan() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
+        app.launch()
+
+        let startButton = app.buttons["Start New Week"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 2))
+        startButton.tap()
+
+        let suggestions = app.navigationBars["Suggestions"]
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
