@@ -12,7 +12,8 @@ final class PersistenceTests: XCTestCase {
             MealSuggestion.self,
         ])
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Test.sqlite")
-        let config = ModelConfiguration(url: url, schema: schema, isStoredInMemoryOnly: false)
+        var config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        config.url = url
         let container = try ModelContainer(for: schema, configurations: [config])
         let manager = DataManager(context: container.mainContext)
         let family = manager.createFamily(name: "Test")
@@ -39,7 +40,8 @@ final class PersistenceTests: XCTestCase {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Test-WeekPlan-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("Store.sqlite")
-        let config = ModelConfiguration(url: url, schema: schema, isStoredInMemoryOnly: false)
+        var config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        config.url = url
         let container = try ModelContainer(for: schema, configurations: [config])
         let manager = DataManager(context: container.mainContext)
         let family = manager.createFamily(name: "Test")
