@@ -6,21 +6,33 @@ struct MealSlotReviewView: View {
     @Environment(\.modelContext) private var context
     @Bindable var slot: MealSlot
     @Bindable var plan: WeeklyPlan
-    var users: [User]
+    var members: [User]
 
     @State private var showRejectSheet = false
     @State private var newTitle: String = ""
-    @State private var selectedUser: User?
+    @State private var selectedResponsible: User?
     @State private var reason: String = ""
+
+    private var reviewer: User? {
+        if let family = plan.family {
+            return family.members.last ?? family.members.first
+        }
+        return nil
+    }
+
+    private func userName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return members.first(where: { $0.id == id })?.name
+    }
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text("\(slot.date, format: Date.FormatStyle(date: .numeric, time: .omitted)) \(slot.mealType.rawValue.capitalized)")
+            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
                 .font(.headline)
             if let pending = slot.pendingSuggestion {
-                Text(pending.title)
-                if let user = pending.user {
-                    Text("Responsible: \(user.name)")
+                Text(pending.mealName)
+                if let responsibleName = userName(for: pending.responsibleUserID) {
+                    Text("Responsible: \(responsibleName)")
                         .font(.caption)
                 }
                 HStack {
@@ -33,8 +45,12 @@ struct MealSlotReviewView: View {
                     .buttonStyle(.bordered)
 
                     Button("Reject") {
-                        newTitle = pending.title
-                        selectedUser = pending.user
+                        newTitle = pending.mealName
+                        if let id = pending.responsibleUserID {
+                            selectedResponsible = members.first(where: { $0.id == id })
+                        } else {
+                            selectedResponsible = nil
+                        }
                         showRejectSheet = true
                     }
                     .buttonStyle(.borderedProminent)
@@ -46,9 +62,9 @@ struct MealSlotReviewView: View {
                 Form {
                     Section("New Suggestion") {
                         TextField("Meal name", text: $newTitle)
-                        Picker("Responsible", selection: $selectedUser) {
+                        Picker("Responsible", selection: $selectedResponsible) {
                             Text("Unassigned").tag(Optional<User>(nil))
-                            ForEach(users) { user in
+                            ForEach(members) { user in
                                 Text(user.name).tag(Optional(user))
                             }
                         }
@@ -57,13 +73,14 @@ struct MealSlotReviewView: View {
                     Button("Submit") {
                         let manager = DataManager(context: context)
                         _ = manager.rejectPendingSuggestion(in: slot,
-                                                           newTitle: newTitle,
-                                                           by: selectedUser,
-                                                           reason: reason.isEmpty ? nil : reason,
+                                                           newMealName: newTitle,
+                                                           author: reviewer,
+                                                           responsibleUser: selectedResponsible,
+                                                           reasonForChange: reason.isEmpty ? nil : reason,
                                                            in: plan)
                         try? context.save()
                         newTitle = ""
-                        selectedUser = nil
+                        selectedResponsible = nil
                         reason = ""
                         showRejectSheet = false
                     }
@@ -85,6 +102,7 @@ struct MealSlotReviewView_Previews: PreviewProvider {
     static var previews: some View {
         let schema = Schema([
             Family.self,
+            User.self,
             WeeklyPlan.self,
             MealSlot.self,
             MealSuggestion.self,
@@ -95,11 +113,14 @@ struct MealSlotReviewView_Previews: PreviewProvider {
         let family = manager.createFamily(name: "Preview")
         let userA = manager.addUser(name: "Alice", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(title: "Eggs", user: userA, for: slot)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Eggs",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: slot)
         try? container.mainContext.save()
 
-        return MealSlotReviewView(slot: slot, plan: plan, users: family.users)
+        return MealSlotReviewView(slot: slot, plan: plan, members: family.members)
             .modelContainer(container)
     }
 }

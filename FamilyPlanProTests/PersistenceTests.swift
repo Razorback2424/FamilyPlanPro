@@ -18,13 +18,13 @@ final class PersistenceTests: XCTestCase {
         let family = manager.createFamily(name: "Test")
         _ = manager.addUser(name: "Dummy", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        _ = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
+        _ = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
         try manager.save()
 
         // Reopen a new container pointing to the same store
         let container2 = try ModelContainer(for: schema, configurations: [config])
         let families = try container2.mainContext.fetch(FetchDescriptor<Family>())
         XCTAssertEqual(families.count, 1)
-        XCTAssertEqual(families.first?.users.count, 1)
+        XCTAssertEqual(families.first?.members.count, 1)
     }
 }

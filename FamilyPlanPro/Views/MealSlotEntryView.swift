@@ -5,20 +5,24 @@ import Observation
 struct MealSlotEntryView: View {
     @Environment(\.modelContext) private var context
     @Bindable var slot: MealSlot
-    var users: [User]
+    var members: [User]
 
     @State private var title: String = ""
-    @State private var selectedUser: User?
+    @State private var selectedResponsible: User?
+
+    private var author: User? {
+        slot.plan?.family?.members.first
+    }
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text("\(slot.date, format: Date.FormatStyle(date: .numeric, time: .omitted)) \(slot.mealType.rawValue.capitalized)")
+            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
                 .font(.headline)
             TextField("Meal name", text: $title)
                 .textFieldStyle(.roundedBorder)
-            Picker("Responsible", selection: $selectedUser) {
+            Picker("Responsible", selection: $selectedResponsible) {
                 Text("Unassigned").tag(Optional<User>(nil))
-                ForEach(users) { user in
+                ForEach(members) { user in
                     Text(user.name).tag(Optional(user))
                 }
             }
@@ -26,10 +30,13 @@ struct MealSlotEntryView: View {
             Button("Add Suggestion") {
                 guard !title.isEmpty else { return }
                 let manager = DataManager(context: context)
-                _ = manager.setPendingSuggestion(title: title, user: selectedUser, for: slot)
+                _ = manager.setPendingSuggestion(mealName: title,
+                                                 responsibleUser: selectedResponsible,
+                                                 author: author,
+                                                 for: slot)
                 try? context.save()
                 title = ""
-                selectedUser = nil
+                selectedResponsible = nil
             }
             .buttonStyle(.borderedProminent)
         }
@@ -41,6 +48,7 @@ struct MealSlotEntryView_Previews: PreviewProvider {
     static var previews: some View {
         let schema = Schema([
             Family.self,
+            User.self,
             WeeklyPlan.self,
             MealSlot.self,
             MealSuggestion.self,
@@ -51,10 +59,10 @@ struct MealSlotEntryView_Previews: PreviewProvider {
         let family = manager.createFamily(name: "Preview")
         _ = manager.addUser(name: "Alice", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
         try? container.mainContext.save()
 
-        return MealSlotEntryView(slot: slot, users: family.users)
+        return MealSlotEntryView(slot: slot, members: family.members)
             .modelContainer(container)
     }
 }

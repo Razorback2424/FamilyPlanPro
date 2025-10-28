@@ -39,5 +39,5 @@ struct AddFamilyView: View {
 
 #Preview {
     AddFamilyView()
-        .modelContainer(for: Family.self, inMemory: true)
+        .modelContainer(for: [Family.self, User.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
 }
