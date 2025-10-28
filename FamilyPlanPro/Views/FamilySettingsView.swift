@@ -109,18 +109,29 @@ struct FamilySettingsView: View {
 }
 
 #Preview {
-    do {
-        let container = try ModelContainer(for: [Family.self, User.self], configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-        let manager = DataManager(context: container.mainContext)
-        let family = manager.createFamily(name: "Preview Family")
-        _ = manager.addUser(name: "Alice", to: family)
-        _ = manager.addUser(name: "Bob", to: family)
+    FamilySettingsView_Preview()
+}
 
-        return NavigationStack {
+private struct FamilySettingsView_Preview: View {
+    let container: ModelContainer
+    let family: Family
+
+    init() {
+        container = try! ModelContainer(
+            for: Family.self, User.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let manager = DataManager(context: container.mainContext)
+        let fam = manager.createFamily(name: "Preview Family")
+        _ = manager.addUser(name: "Alice", to: fam)
+        _ = manager.addUser(name: "Bob", to: fam)
+        self.family = fam
+    }
+
+    var body: some View {
+        NavigationStack {
             FamilySettingsView(family: family)
         }
         .modelContainer(container)
-    } catch {
-        return Text("Preview Unavailable")
     }
 }
