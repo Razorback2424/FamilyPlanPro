@@ -109,19 +109,41 @@ final class DataManager {
             }
         }
 
-        if shouldEnterConflict {
-            plan.status = .conflict
-        } else if plan.status != .conflict {
-            plan.status = .reviewMode
-        }
-
         let suggestion = MealSuggestion(mealName: newMealName,
                                         responsibleUserID: responsibleUser?.id,
                                         authorUserID: author?.id,
                                         reasonForChange: reasonForChange,
                                         slot: slot)
         slot.pendingSuggestion = suggestion
-        plan.lastModifiedByUserID = author?.id
+        if shouldEnterConflict {
+            plan.status = .conflict
+        } else {
+            if plan.status != .conflict {
+                plan.status = .reviewMode
+            }
+            plan.lastModifiedByUserID = author?.id
+        }
+        context.insert(suggestion)
+        return suggestion
+    }
+
+    func resolveConflict(for slot: MealSlot,
+                         finalMealName: String,
+                         decidedBy user: User?,
+                         responsibleUser: User?,
+                         reasonForChange: String? = nil,
+                         in plan: WeeklyPlan) -> MealSuggestion {
+        let trimmedName = finalMealName.trimmingCharacters(in: .whitespacesAndNewlines)
+        precondition(!trimmedName.isEmpty, "Final meal name must not be empty")
+
+        let suggestion = MealSuggestion(mealName: trimmedName,
+                                        responsibleUserID: responsibleUser?.id,
+                                        authorUserID: user?.id,
+                                        reasonForChange: reasonForChange,
+                                        slot: slot)
+        slot.pendingSuggestion = suggestion
+        plan.lastModifiedByUserID = user?.id
+        plan.status = .reviewMode
         context.insert(suggestion)
         return suggestion
     }
