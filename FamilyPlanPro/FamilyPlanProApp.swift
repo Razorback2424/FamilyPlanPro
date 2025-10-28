@@ -29,8 +29,7 @@ struct FamilyPlanProApp: App {
             assertionFailure("Unable to create application support directory: \(error)")
         }
 
-        var configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        configuration.url = storeURL
+        let configuration = ModelConfiguration(schema: schema, url: storeURL)
 
         func makeContainer() throws -> ModelContainer {
             try ModelContainer(for: schema, configurations: [configuration])
@@ -137,3 +136,4 @@ struct FamilyPlanProApp: App {
         try? manager.save()
     }
 }
+
