@@ -32,8 +32,11 @@ struct FamilyPlanProApp: App {
         WindowGroup {
             MainTabView()
                 .onAppear {
-                    if let statusString = ProcessInfo.processInfo.environment["UITEST_STATUS"],
-                       let status = PlanStatus(rawValue: statusString) {
+                    let environment = ProcessInfo.processInfo.environment
+                    if environment["UITEST_EMPTY_STATE"] == "1" {
+                        seedEmptyStateData()
+                    } else if let statusString = environment["UITEST_STATUS"],
+                              let status = PlanStatus(rawValue: statusString) {
                         seedData(for: status)
                     }
                 }
@@ -78,6 +81,20 @@ struct FamilyPlanProApp: App {
             break
         }
 
+        try? manager.save()
+    }
+
+    private func seedEmptyStateData() {
+        let context = sharedModelContainer.mainContext
+        if let existingFamilies = try? context.fetch(FetchDescriptor<Family>()),
+           !existingFamilies.isEmpty {
+            return
+        }
+
+        let manager = DataManager(context: context)
+        let family = manager.createFamily(name: "UITest")
+        _ = manager.addUser(name: "Alice", to: family)
+        _ = manager.addUser(name: "Bob", to: family)
         try? manager.save()
     }
 }

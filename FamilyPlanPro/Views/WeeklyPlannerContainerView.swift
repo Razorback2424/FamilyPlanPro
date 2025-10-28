@@ -30,7 +30,30 @@ struct WeeklyPlannerContainerView: View {
                     FinalizedView()
                 }
             } else {
-                ProgressView()
+                VStack(spacing: 16) {
+                    Spacer()
+
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+
+                    Text("It's time to start planning this week's meals.")
+                        .multilineTextAlignment(.center)
+                        .font(.title3)
+
+                    Text("Tap below to generate a new weekly plan and start reviewing personalized suggestions right away.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+
+                    Button("Start New Week") {
+                        createWeekIfNeeded()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
             }
         }
         .navigationTitle("Weekly Planner")
@@ -40,10 +63,6 @@ struct WeeklyPlannerContainerView: View {
                     Label("New Family", systemImage: "plus")
                 }
             }
-        }
-        .onAppear(perform: createWeekIfNeeded)
-        .onChange(of: families.count) { _, _ in
-            createWeekIfNeeded()
         }
         .sheet(isPresented: $showingAddFamily) {
             NavigationStack { AddFamilyView() }
