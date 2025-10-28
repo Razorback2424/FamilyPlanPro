@@ -6,6 +6,7 @@ struct SuggestionView: View {
     @Environment(\.modelContext) private var context
     @Bindable var plan: WeeklyPlan
     var currentUser: User?
+    @State private var showIncompleteSuggestionsAlert = false
 
     private var members: [User] {
         plan.family?.members ?? []
@@ -28,6 +29,17 @@ struct SuggestionView: View {
         }
 
         return sections.isEmpty ? nil : sections
+    }
+
+    private var hasSuggestionsForAllSlots: Bool {
+        let slots = plan.mealSlots
+        guard !slots.isEmpty else { return false }
+
+        return slots.allSatisfy { slot in
+            let suggestion = slot.pendingSuggestion ?? slot.finalizedSuggestion
+            guard let suggestion else { return false }
+            return !suggestion.mealName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     var body: some View {
@@ -77,11 +89,20 @@ struct SuggestionView: View {
         .toolbar {
             Button("Submit for Review") {
                 guard let user = currentUser else { return }
+                guard hasSuggestionsForAllSlots else {
+                    showIncompleteSuggestionsAlert = true
+                    return
+                }
                 let manager = DataManager(context: context)
                 manager.submitPlanForReview(plan, by: user)
                 try? context.save()
             }
             .disabled(currentUser == nil)
+        }
+        .alert("Add Meal Suggestions", isPresented: $showIncompleteSuggestionsAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please add a suggestion for every meal this week before submitting for review.")
         }
     }
 }
