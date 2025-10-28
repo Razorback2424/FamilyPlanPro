@@ -33,7 +33,7 @@ struct FamilyPlanProApp: App {
             MainTabView()
                 .onAppear {
                     if let statusString = ProcessInfo.processInfo.environment["UITEST_STATUS"],
-                       let status = WeeklyPlan.Status(rawValue: statusString) {
+                       let status = PlanStatus(rawValue: statusString) {
                         seedData(for: status)
                     }
                 }
@@ -41,14 +41,17 @@ struct FamilyPlanProApp: App {
         .modelContainer(sharedModelContainer)
     }
 
-    private func seedData(for status: WeeklyPlan.Status) {
+    private func seedData(for status: PlanStatus) {
         let manager = DataManager(context: sharedModelContainer.mainContext)
         let family = manager.createFamily(name: "UITest")
         let userA = manager.addUser(name: "Alice", to: family)
         let userB = manager.addUser(name: "Bob", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(title: "Test", user: userA, for: slot)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Test",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: slot)
 
         switch status {
         case .reviewMode:
@@ -59,8 +62,18 @@ struct FamilyPlanProApp: App {
             manager.finalizeIfPossible(plan)
         case .conflict:
             manager.submitPlanForReview(plan, by: userA)
-            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt", by: userB, reason: nil, in: plan)
-            _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Alt2", by: userA, reason: nil, in: plan)
+            _ = manager.rejectPendingSuggestion(in: slot,
+                                               newMealName: "Alt",
+                                               author: userB,
+                                               responsibleUser: userB,
+                                               reasonForChange: nil,
+                                               in: plan)
+            _ = manager.rejectPendingSuggestion(in: slot,
+                                               newMealName: "Alt2",
+                                               author: userA,
+                                               responsibleUser: userA,
+                                               reasonForChange: nil,
+                                               in: plan)
         case .suggestionMode:
             break
         }

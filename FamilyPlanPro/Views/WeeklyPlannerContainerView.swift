@@ -61,6 +61,6 @@ struct WeeklyPlannerContainerView: View {
 struct WeeklyPlannerContainerView_Previews: PreviewProvider {
     static var previews: some View {
         WeeklyPlannerContainerView()
-            .modelContainer(for: [Family.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
+            .modelContainer(for: [Family.self, User.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
     }
 }

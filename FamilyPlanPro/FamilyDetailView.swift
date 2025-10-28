@@ -8,7 +8,7 @@ struct FamilyDetailView: View {
 
     var body: some View {
         List {
-            ForEach(family.plans) { plan in
+            ForEach(family.weeklyPlans) { plan in
                 Text(plan.startDate, format: Date.FormatStyle(date: .numeric, time: .omitted))
             }
         }
@@ -19,6 +19,6 @@ struct FamilyDetailView: View {
 struct FamilyDetailView_Previews: PreviewProvider {
     static var previews: some View {
         FamilyDetailView(family: Family(name: "Preview"))
-            .modelContainer(for: Family.self, inMemory: true)
+            .modelContainer(for: [Family.self, User.self, WeeklyPlan.self, MealSlot.self, MealSuggestion.self], inMemory: true)
     }
 }

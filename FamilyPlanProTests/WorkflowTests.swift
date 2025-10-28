@@ -16,20 +16,27 @@ final class WorkflowTests: XCTestCase {
         let manager = DataManager(context: container.mainContext)
         let family = manager.createFamily(name: "Test")
         let userA = manager.addUser(name: "Alice", to: family)
-        _ = manager.addUser(name: "Bob", to: family)
+        let userB = manager.addUser(name: "Bob", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(title: "Toast", user: userA, for: slot)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Toast",
+                                         responsibleUser: userB,
+                                         author: userA,
+                                         for: slot)
         try manager.save()
 
+        XCTAssertEqual(slot.pendingSuggestion?.authorUserID, userA.id)
+        XCTAssertEqual(slot.pendingSuggestion?.responsibleUserID, userB.id)
         XCTAssertEqual(plan.status, .suggestionMode)
         manager.submitPlanForReview(plan, by: userA)
         XCTAssertEqual(plan.status, .reviewMode)
-        XCTAssertEqual(plan.lastModifiedByUserID, userA.name)
+        XCTAssertEqual(plan.lastModifiedByUserID, userA.id)
 
         manager.acceptPendingSuggestion(in: slot)
         manager.finalizeIfPossible(plan)
         XCTAssertEqual(plan.status, .finalized)
+        XCTAssertEqual(slot.finalizedSuggestion?.authorUserID, userA.id)
+        XCTAssertEqual(slot.finalizedSuggestion?.responsibleUserID, userB.id)
     }
 
     func testCounterReviewKeepsReviewMode() throws {
@@ -47,15 +54,25 @@ final class WorkflowTests: XCTestCase {
         let userA = manager.addUser(name: "Alice", to: family)
         let userB = manager.addUser(name: "Bob", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(title: "Toast", user: userA, for: slot)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Toast",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: slot)
         try manager.save()
 
         manager.submitPlanForReview(plan, by: userA)
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, reason: nil, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot,
+                                           newMealName: "Bagel",
+                                           author: userB,
+                                           responsibleUser: userB,
+                                           reasonForChange: nil,
+                                           in: plan)
 
         XCTAssertEqual(plan.status, .reviewMode)
-        XCTAssertEqual(plan.lastModifiedByUserID, userB.name)
+        XCTAssertEqual(plan.lastModifiedByUserID, userB.id)
+        XCTAssertEqual(slot.pendingSuggestion?.authorUserID, userB.id)
+        XCTAssertEqual(slot.pendingSuggestion?.responsibleUserID, userB.id)
     }
 
     func testConflictOnSecondRejection() throws {
@@ -73,17 +90,32 @@ final class WorkflowTests: XCTestCase {
         let userA = manager.addUser(name: "Alice", to: family)
         let userB = manager.addUser(name: "Bob", to: family)
         let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(title: "Toast", user: userA, for: slot)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Toast",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: slot)
         try manager.save()
 
         manager.submitPlanForReview(plan, by: userA)
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Bagel", by: userB, reason: nil, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot,
+                                           newMealName: "Bagel",
+                                           author: userB,
+                                           responsibleUser: userB,
+                                           reasonForChange: nil,
+                                           in: plan)
 
-        _ = manager.rejectPendingSuggestion(in: slot, newTitle: "Cereal", by: userA, reason: nil, in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot,
+                                           newMealName: "Cereal",
+                                           author: userA,
+                                           responsibleUser: userA,
+                                           reasonForChange: nil,
+                                           in: plan)
 
         XCTAssertEqual(plan.status, .conflict)
-        XCTAssertEqual(plan.lastModifiedByUserID, userA.name)
+        XCTAssertEqual(plan.lastModifiedByUserID, userA.id)
+        XCTAssertEqual(slot.pendingSuggestion?.authorUserID, userA.id)
+        XCTAssertEqual(slot.pendingSuggestion?.responsibleUserID, userA.id)
     }
 
     func testCurrentPlanLookup() throws {

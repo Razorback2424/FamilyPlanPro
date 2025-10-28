@@ -19,7 +19,7 @@ final class DataManager {
     // MARK: - User
     func addUser(name: String, to family: Family) -> User {
         let user = User(name: name, family: family)
-        family.users.append(user)
+        family.members.append(user)
         context.insert(user)
         return user
     }
@@ -27,14 +27,14 @@ final class DataManager {
     // MARK: - Plan
     func createWeeklyPlan(startDate: Date, for family: Family) -> WeeklyPlan {
         let plan = WeeklyPlan(startDate: startDate, status: .suggestionMode, family: family)
-        family.plans.append(plan)
+        family.weeklyPlans.append(plan)
         context.insert(plan)
         return plan
     }
 
-    func addMealSlot(date: Date, type: MealSlot.MealType, to plan: WeeklyPlan) -> MealSlot {
-        let slot = MealSlot(date: date, mealType: type, plan: plan)
-        plan.slots.append(slot)
+    func addMealSlot(dayOfWeek: DayOfWeek, mealType: MealType, to plan: WeeklyPlan) -> MealSlot {
+        let slot = MealSlot(dayOfWeek: dayOfWeek, mealType: mealType, plan: plan)
+        plan.mealSlots.append(slot)
         context.insert(slot)
         return slot
     }
@@ -44,18 +44,24 @@ final class DataManager {
     func createCurrentWeekPlan(for family: Family) -> WeeklyPlan {
         let start = Calendar.current.startOfWeek(for: .now)
         let plan = createWeeklyPlan(startDate: start, for: family)
-        let calendar = Calendar.current
-        for dayOffset in 0..<7 {
-            let date = calendar.date(byAdding: .day, value: dayOffset, to: start)!
-            for meal in MealSlot.MealType.allCases {
-                _ = addMealSlot(date: date, type: meal, to: plan)
+        for day in DayOfWeek.allCases {
+            for meal in MealType.allCases {
+                _ = addMealSlot(dayOfWeek: day, mealType: meal, to: plan)
             }
         }
         return plan
     }
 
-    func setPendingSuggestion(title: String, user: User? = nil, for slot: MealSlot) -> MealSuggestion {
-        let suggestion = MealSuggestion(title: title, user: user, slot: slot)
+    func setPendingSuggestion(mealName: String,
+                              responsibleUser: User? = nil,
+                              author: User? = nil,
+                              reasonForChange: String? = nil,
+                              for slot: MealSlot) -> MealSuggestion {
+        let suggestion = MealSuggestion(mealName: mealName,
+                                        responsibleUserID: responsibleUser?.id,
+                                        authorUserID: author?.id,
+                                        reasonForChange: reasonForChange,
+                                        slot: slot)
         slot.pendingSuggestion = suggestion
         context.insert(suggestion)
         return suggestion
@@ -69,33 +75,35 @@ final class DataManager {
     }
 
     func rejectPendingSuggestion(in slot: MealSlot,
-                                 newTitle: String,
-                                 by user: User?,
-                                 reason: String? = nil,
+                                 newMealName: String,
+                                 author: User?,
+                                 responsibleUser: User?,
+                                 reasonForChange: String? = nil,
                                  in plan: WeeklyPlan) -> MealSuggestion {
         if let lastUserID = plan.lastModifiedByUserID,
-           let rejectingUser = user,
-           lastUserID != rejectingUser.name {
+           let rejectingUser = author,
+           lastUserID != rejectingUser.id {
             plan.status = .conflict
         }
 
-        let suggestion = MealSuggestion(title: newTitle,
-                                        user: user,
-                                        slot: slot,
-                                        reason: reason)
+        let suggestion = MealSuggestion(mealName: newMealName,
+                                        responsibleUserID: responsibleUser?.id,
+                                        authorUserID: author?.id,
+                                        reasonForChange: reasonForChange,
+                                        slot: slot)
         slot.pendingSuggestion = suggestion
-        plan.lastModifiedByUserID = user?.name
+        plan.lastModifiedByUserID = author?.id
         context.insert(suggestion)
         return suggestion
     }
 
     func submitPlanForReview(_ plan: WeeklyPlan, by user: User) {
         plan.status = .reviewMode
-        plan.lastModifiedByUserID = user.name
+        plan.lastModifiedByUserID = user.id
     }
 
     func finalizeIfPossible(_ plan: WeeklyPlan) {
-        let pendingSlots = plan.slots.filter { $0.pendingSuggestion != nil }
+        let pendingSlots = plan.mealSlots.filter { $0.pendingSuggestion != nil }
         if pendingSlots.isEmpty {
             plan.status = .finalized
         }
@@ -111,12 +119,15 @@ final class DataManager {
 func createDummyData(context: ModelContext) {
     let manager = DataManager(context: context)
     let family = manager.createFamily(name: "Testers")
-    _ = manager.addUser(name: "Alice", to: family)
-    _ = manager.addUser(name: "Bob", to: family)
+    let author = manager.addUser(name: "Alice", to: family)
+    let responsible = manager.addUser(name: "Bob", to: family)
 
     let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-    let mondayBreakfast = manager.addMealSlot(date: .now, type: .breakfast, to: plan)
-    _ = manager.setPendingSuggestion(title: "Pancakes", user: family.users.first, for: mondayBreakfast)
+    let mondayBreakfast = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+    _ = manager.setPendingSuggestion(mealName: "Pancakes",
+                                     responsibleUser: responsible,
+                                     author: author,
+                                     for: mondayBreakfast)
 
     try? manager.save()
 }
