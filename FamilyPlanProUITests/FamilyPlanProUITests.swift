@@ -86,9 +86,69 @@ final class FamilyPlanProUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 1))
         field.tap()
         field.typeText("Test")
+        let memberField = app.textFields["Member Name"]
+        XCTAssertTrue(memberField.waitForExistence(timeout: 1))
+        memberField.tap()
+        memberField.typeText("Alex")
+        let addButton = app.buttons["Add Person"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 1))
+        addButton.tap()
         app.buttons["Create"].tap()
         let suggestions = app.navigationBars["Suggestions"]
         XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testAddedMembersAppearInResponsiblePicker() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launch()
+
+        let familyField = app.textFields["Family Name"]
+        XCTAssertTrue(familyField.waitForExistence(timeout: 1))
+        familyField.tap()
+        familyField.typeText("Responsible Test")
+
+        let memberField = app.textFields["Member Name"]
+        XCTAssertTrue(memberField.waitForExistence(timeout: 1))
+        memberField.tap()
+        memberField.typeText("Alex")
+        let addButton = app.buttons["Add Person"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 1))
+        addButton.tap()
+
+        memberField.tap()
+        memberField.typeText("Jamie")
+        addButton.tap()
+
+        app.buttons["Create"].tap()
+
+        let suggestions = app.navigationBars["Suggestions"]
+        XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+
+        let mealField = app.textFields["Meal name"].firstMatch
+        XCTAssertTrue(mealField.waitForExistence(timeout: 2))
+        mealField.tap()
+        mealField.typeText("Chili")
+
+        let saveButton = app.buttons["Save Suggestion"].firstMatch
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Responsible: Alex"].waitForExistence(timeout: 2))
+
+        let predicate = NSPredicate(format: "label CONTAINS[c] %@", "Responsible")
+        let responsibleMenu = app.buttons.matching(predicate).firstMatch
+        XCTAssertTrue(responsibleMenu.waitForExistence(timeout: 2))
+        responsibleMenu.tap()
+
+        let alternateOption = app.buttons["Jamie"]
+        XCTAssertTrue(alternateOption.waitForExistence(timeout: 2))
+        alternateOption.tap()
+
+        saveButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Responsible: Jamie"].waitForExistence(timeout: 2))
     }
 
     @MainActor
