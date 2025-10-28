@@ -2,72 +2,37 @@ import SwiftUI
 import SwiftData
 import Observation
 
+enum ResponsibleSelection: Hashable {
+    case unassigned
+    case user(UUID)
+
+    var responsibleID: UUID? {
+        switch self {
+        case .unassigned:
+            return nil
+        case .user(let id):
+            return id
+        }
+    }
+}
+
 struct MealSlotEntryView: View {
-    @Environment(\.modelContext) private var context
     @Bindable var slot: MealSlot
     var members: [User]
-    var currentUser: User?
+    @Binding var mealName: String
+    @Binding var responsibleSelection: ResponsibleSelection
+    var onClearSuggestion: (() -> Void)?
 
-    @State private var mealName: String
-    @State private var selectedResponsibleID: UUID?
-
-    init(slot: MealSlot, members: [User], currentUser: User?) {
+    init(slot: MealSlot,
+         members: [User],
+         mealName: Binding<String>,
+         responsibleSelection: Binding<ResponsibleSelection>,
+         onClearSuggestion: (() -> Void)? = nil) {
         self._slot = Bindable(wrappedValue: slot)
         self.members = members
-        self.currentUser = currentUser
-        _mealName = State(initialValue: slot.pendingSuggestion?.mealName ?? "")
-        _selectedResponsibleID = State(initialValue: slot.pendingSuggestion?.responsibleUserID ?? currentUser?.id)
-    }
-
-    private var pendingSuggestion: MealSuggestion? {
-        slot.pendingSuggestion
-    }
-
-    private var buttonTitle: String {
-        pendingSuggestion == nil ? "Save Suggestion" : "Update Suggestion"
-    }
-
-    private func syncStateWithSlot() {
-        if let suggestion = slot.pendingSuggestion {
-            mealName = suggestion.mealName
-            selectedResponsibleID = suggestion.responsibleUserID
-        } else {
-            mealName = ""
-            selectedResponsibleID = currentUser?.id
-        }
-    }
-
-    private func saveSuggestion() {
-        let trimmedName = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
-
-        let responsibleUser = members.first { $0.id == selectedResponsibleID }
-        if let suggestion = slot.pendingSuggestion {
-            suggestion.mealName = trimmedName
-            suggestion.responsibleUserID = responsibleUser?.id
-            suggestion.authorUserID = currentUser?.id ?? suggestion.authorUserID
-        } else {
-            let manager = DataManager(context: context)
-            _ = manager.setPendingSuggestion(mealName: trimmedName,
-                                             responsibleUser: responsibleUser,
-                                             author: currentUser,
-                                             for: slot)
-        }
-        slot.plan?.lastModifiedByUserID = currentUser?.id
-        try? context.save()
-        syncStateWithSlot()
-    }
-
-    private func clearSuggestion() {
-        if let suggestion = slot.pendingSuggestion {
-            context.delete(suggestion)
-        }
-        slot.pendingSuggestion = nil
-        slot.plan?.lastModifiedByUserID = currentUser?.id
-        mealName = ""
-        selectedResponsibleID = currentUser?.id
-        try? context.save()
-        syncStateWithSlot()
+        self._mealName = mealName
+        self._responsibleSelection = responsibleSelection
+        self.onClearSuggestion = onClearSuggestion
     }
 
     var body: some View {
@@ -75,40 +40,21 @@ struct MealSlotEntryView: View {
             TextField("Meal name", text: $mealName)
                 .textFieldStyle(.roundedBorder)
 
-            Picker("Responsible", selection: Binding(get: {
-                selectedResponsibleID
-            }, set: { newValue in
-                selectedResponsibleID = newValue
-            })) {
-                Text("Unassigned").tag(UUID?.none)
+            Picker("Responsible", selection: $responsibleSelection) {
+                Text("Unassigned").tag(ResponsibleSelection.unassigned)
                 ForEach(members) { user in
-                    Text(user.name).tag(UUID?.some(user.id))
+                    Text(user.name).tag(ResponsibleSelection.user(user.id))
                 }
             }
             .pickerStyle(.menu)
 
-            HStack {
-                Button(buttonTitle) {
-                    saveSuggestion()
+            if let onClearSuggestion,
+               slot.pendingSuggestion != nil {
+                Button("Clear Saved Suggestion") {
+                    onClearSuggestion()
                 }
-                .buttonStyle(.borderedProminent)
-
-                if pendingSuggestion != nil {
-                    Button("Clear Suggestion") {
-                        clearSuggestion()
-                    }
-                    .buttonStyle(.bordered)
-                }
+                .buttonStyle(.bordered)
             }
-        }
-        .onChange(of: slot.pendingSuggestion?.mealName) { _ in
-            syncStateWithSlot()
-        }
-        .onChange(of: slot.pendingSuggestion?.responsibleUserID) { _ in
-            syncStateWithSlot()
-        }
-        .onAppear {
-            syncStateWithSlot()
         }
         .accessibilityIdentifier("slot-entry-\(slot.id.uuidString)")
     }
@@ -132,7 +78,21 @@ struct MealSlotEntryView_Previews: PreviewProvider {
         let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
         try? container.mainContext.save()
 
-        return MealSlotEntryView(slot: slot, members: family.members, currentUser: family.members.first)
+        struct PreviewWrapper: View {
+            @State var mealName: String = ""
+            @State var responsibleSelection: ResponsibleSelection = .unassigned
+            var slot: MealSlot
+            var members: [User]
+
+            var body: some View {
+                MealSlotEntryView(slot: slot,
+                                  members: members,
+                                  mealName: $mealName,
+                                  responsibleSelection: $responsibleSelection)
+            }
+        }
+
+        return PreviewWrapper(slot: slot, members: family.members)
             .modelContainer(container)
     }
 }
