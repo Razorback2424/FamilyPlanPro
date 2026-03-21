@@ -20,10 +20,18 @@ final class FamilyPlanProUITestsLaunchTests: XCTestCase {
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
         app.launch()
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Planner"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 2))
+
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 2))
+
+        app.tabBars.buttons["Planner"].tap()
+        XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 2))
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"

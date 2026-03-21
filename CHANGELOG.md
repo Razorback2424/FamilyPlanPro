@@ -1,7 +1,9 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Add a launch smoke test that verifies Planner/Settings navigation from the top-level tabs.
 - Tests: Add shared Xcode schemes so `xcodebuild` can isolate unit tests from UI-test orchestration.
+- Tests: Add Stage 1 coverage for accepting a resolved meal conflict without leaving pending or orphaned suggestions.
 - Stage 1: Clear old meal suggestions during conflict resolution and add focused orphan-cleanup coverage for the resolve path.
 - Stage 1: Route grocery-list screen cadence updates through DataManager so notification eligibility is decided in one place.
 - Stage 1: Make grocery cadence timing deterministic under test and cover the remaining-days-only Sun/Thu scheduling rules.

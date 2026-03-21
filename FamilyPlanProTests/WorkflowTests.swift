@@ -245,6 +245,50 @@ final class WorkflowTests: XCTestCase {
         XCTAssertEqual(suggestions.count, 1)
     }
 
+    func testResolvedConflictCanStillBeAcceptedWithoutLeavingExtraSuggestions() throws {
+        let container = try makeContainer()
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let userB = manager.addUser(name: "Bob", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .dinner, to: plan)
+        _ = manager.setPendingSuggestion(mealName: "Toast",
+                                         responsibleUser: userA,
+                                         author: userA,
+                                         for: slot)
+
+        manager.submitPlanForReview(plan, by: userA)
+        _ = manager.rejectPendingSuggestion(in: slot,
+                                           newMealName: "Bagel",
+                                           author: userB,
+                                           responsibleUser: userB,
+                                           reasonForChange: nil,
+                                           in: plan)
+        _ = manager.rejectPendingSuggestion(in: slot,
+                                           newMealName: "Cereal",
+                                           author: userA,
+                                           responsibleUser: userA,
+                                           reasonForChange: nil,
+                                           in: plan)
+
+        _ = manager.resolveConflict(for: slot,
+                                    finalMealName: "Soup",
+                                    decidedBy: userB,
+                                    responsibleUser: userB,
+                                    reasonForChange: nil,
+                                    in: plan)
+        manager.acceptPendingSuggestion(in: slot)
+
+        let suggestions = try container.mainContext.fetch(FetchDescriptor<MealSuggestion>())
+        XCTAssertEqual(plan.status, .reviewMode)
+        XCTAssertEqual(plan.lastModifiedByUserID, userB.id)
+        XCTAssertNil(slot.pendingSuggestion)
+        XCTAssertEqual(slot.finalizedSuggestion?.mealName, "Soup")
+        XCTAssertEqual(slot.finalizedSuggestion?.authorUserID, userB.id)
+        XCTAssertEqual(suggestions.count, 1)
+    }
+
     func testFinalizeRequiresAllSevenDinnerSlotsAccepted() throws {
         let container = try makeContainer()
         let manager = DataManager(context: container.mainContext, flags: makeStage1Flags())
