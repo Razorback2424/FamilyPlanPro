@@ -33,8 +33,8 @@ private struct SettingsTabContainerView: View {
 
     var body: some View {
         Group {
-            if let family = families.first {
-                FamilySettingsView(family: family)
+            if families.first != nil {
+                SettingsView()
             } else {
                 AddFamilyView()
             }

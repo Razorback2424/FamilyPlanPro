@@ -107,13 +107,14 @@ struct GroceryListView: View {
         guard calendar.isDate(plan.startDate, equalTo: startOfWeek, toGranularity: .day) else { return }
         guard !list.items.isEmpty else { return }
         GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
-            .scheduleNudges(weekStart: plan.startDate, listId: list.id.uuidString)
+            .scheduleNudges(weekStart: plan.startDate, weekId: plan.id.uuidString)
     }
 
     private func cancelCadenceIfNeeded() {
         guard featureFlags.notificationsGroceryCadence else { return }
+        guard let plan = list.plan else { return }
         GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
-            .cancelNudges(listId: list.id.uuidString)
+            .cancelNudges(weekId: plan.id.uuidString)
     }
 }
 

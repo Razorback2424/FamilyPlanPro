@@ -30,6 +30,10 @@ struct SettingsView: View {
         return plans.first { calendar.isDate($0.startDate, equalTo: startOfThisWeek, toGranularity: .day) }
     }
 
+    private var canEditObservedSpend: Bool {
+        currentPlan?.groceryList != nil
+    }
+
     private var budgetStatusColor: Color {
         switch currentPlan?.budgetStatus {
         case .under:
@@ -77,6 +81,12 @@ struct SettingsView: View {
                         .keyboardType(.numberPad)
                     TextField("Observed spend ($)", text: $observedSpend)
                         .keyboardType(.numberPad)
+                        .disabled(!canEditObservedSpend)
+                    if !canEditObservedSpend {
+                        Text("Finalize meals to create a grocery list before entering observed spend.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     Text("Status: \(plan.budgetStatus.rawValue.capitalized)")
                         .font(.caption)
                         .foregroundStyle(budgetStatusColor)
@@ -96,15 +106,28 @@ struct SettingsView: View {
             let manager = DataManager(context: context)
             let family = manager.getOrCreateDefaultFamily()
             manager.ensureDefaultUsersIfNeeded(for: family)
-            if let plan = currentPlan {
-                if budgetTarget.isEmpty, plan.budgetTargetCents > 0 {
-                    budgetTarget = String(plan.budgetTargetCents / 100)
-                }
-                if observedSpend.isEmpty, let list = plan.groceryList, list.budgetObservedCents > 0 {
-                    observedSpend = String(list.budgetObservedCents / 100)
-                }
-            }
+            syncBudgetFields()
             try? context.save()
+        }
+        .onChange(of: currentPlan?.id) { _, _ in
+            syncBudgetFields()
+        }
+        .onChange(of: currentPlan?.groceryList?.id) { _, _ in
+            syncBudgetFields()
+        }
+    }
+
+    private func syncBudgetFields() {
+        guard let plan = currentPlan else {
+            budgetTarget = ""
+            observedSpend = ""
+            return
+        }
+        budgetTarget = plan.budgetTargetCents > 0 ? String(plan.budgetTargetCents / 100) : ""
+        if let list = plan.groceryList, list.budgetObservedCents > 0 {
+            observedSpend = String(list.budgetObservedCents / 100)
+        } else {
+            observedSpend = ""
         }
     }
 }
@@ -112,6 +135,6 @@ struct SettingsView: View {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
-            .modelContainer(for: [Family.self, User.self], inMemory: true)
+            .modelContainer(for: [Family.self, User.self, WeeklyPlan.self, OwnershipRulesSnap.self, MealSlot.self, MealSuggestion.self, GroceryList.self, GroceryItem.self], inMemory: true)
     }
 }

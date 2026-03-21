@@ -27,8 +27,8 @@ final class DataManager {
     func getOrCreateCurrentWeekPlan(for family: Family) -> WeeklyPlan {
         if let existing = currentWeekPlan(for: family) {
             ensureSeededSlots(for: existing)
-            syncOwnersForAssignments(in: existing)
             ensureOwnershipRules(for: existing, family: family)
+            syncOwnersForAssignments(in: existing)
             return existing
         }
         let plan = createCurrentWeekPlan(for: family)
@@ -227,12 +227,13 @@ final class DataManager {
     func reopenPlanToSuggestion(_ plan: WeeklyPlan) {
         plan.status = .suggestionMode
         if flags.mealsGroceryList, let list = plan.groceryList {
-            cancelGroceryCadence(for: list)
+            cancelGroceryCadence(for: plan)
             context.delete(list)
             plan.groceryList = nil
         }
         if flags.mealsOwnershipRules, let family = plan.family {
             ensureOwnershipRules(for: plan, family: family)
+            syncOwnersForAssignments(in: plan)
         }
     }
 
@@ -316,20 +317,53 @@ final class DataManager {
         if plan.ownershipRulesSnap?.fridaySimple == true {
             slot.isSimple = (weekday == 6)
         }
+        guard let ownerID = plan.ownershipRulesSnap?.rules[String(weekday)],
+              let ownerUUID = UUID(uuidString: ownerID),
+              let family = plan.family else {
+            return
+        }
+        slot.owner = family.members.first(where: { $0.id == ownerUUID })
     }
 
     private func syncOwnerWithAssignments(for slot: MealSlot) {
         let responsibleID = slot.finalizedSuggestion?.responsibleUserID ?? slot.pendingSuggestion?.responsibleUserID
-        guard let responsibleID, let family = slot.plan?.family else {
-            slot.owner = nil
+        guard let family = slot.plan?.family else {
             return
         }
-        slot.owner = family.members.first(where: { $0.id == responsibleID })
+        if let responsibleID {
+            slot.owner = family.members.first(where: { $0.id == responsibleID })
+            return
+        }
+        if let ownerID = slot.plan?.ownershipRulesSnap?.rules[String(slot.dayOfWeek.rawValue)],
+           let ownerUUID = UUID(uuidString: ownerID) {
+            slot.owner = family.members.first(where: { $0.id == ownerUUID })
+        }
     }
 
     func reapplyOwnershipIfNeeded(for plan: WeeklyPlan) {
         guard flags.mealsOwnershipRules, let family = plan.family else { return }
         ensureOwnershipRules(for: plan, family: family)
+    }
+
+    func updateOwnershipRule(for day: DayOfWeek, owner: User?, in plan: WeeklyPlan) {
+        guard flags.mealsOwnershipRules, let family = plan.family else { return }
+        ensureOwnershipRules(for: plan, family: family)
+
+        var rules = plan.ownershipRulesSnap?.rules ?? [:]
+        if let owner {
+            rules[String(day.rawValue)] = owner.id.uuidString
+        } else {
+            rules.removeValue(forKey: String(day.rawValue))
+        }
+        plan.ownershipRulesSnap?.rules = rules
+
+        for slot in plan.slots where slot.mealType == .dinner && slot.dayOfWeek == day {
+            if slot.pendingSuggestion == nil && slot.finalizedSuggestion == nil {
+                slot.owner = owner
+            } else {
+                syncOwnerWithAssignments(for: slot)
+            }
+        }
     }
 
     func syncOwnersForAssignments(in plan: WeeklyPlan) {
@@ -339,11 +373,14 @@ final class DataManager {
     }
 
     func reconcileGroceryCadence(for plan: WeeklyPlan) {
-        guard let list = plan.groceryList else { return }
+        guard let list = plan.groceryList else {
+            cancelGroceryCadence(for: plan)
+            return
+        }
         if flags.notificationsGroceryCadence && flags.mealsGroceryList {
             scheduleGroceryCadenceIfEligible(for: plan, list: list)
         } else {
-            cancelGroceryCadence(for: list)
+            cancelGroceryCadence(for: plan)
         }
     }
 
@@ -365,7 +402,7 @@ final class DataManager {
 
     private func createOrReplaceGroceryList(for plan: WeeklyPlan, slots: [MealSlot]) -> GroceryList? {
         if let existing = plan.groceryList {
-            cancelGroceryCadence(for: existing)
+            cancelGroceryCadence(for: plan)
             context.delete(existing)
             plan.groceryList = nil
         }
@@ -375,10 +412,17 @@ final class DataManager {
         let sortedSlots = slots.sorted { $0.date < $1.date }
         for slot in sortedSlots {
             guard let finalized = slot.finalizedSuggestion else { continue }
+            let trimmedName = finalized.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else { continue }
             let dayRef = Calendar.current.startOfDay(for: slot.date)
-            let item = GroceryItem(name: finalized.title, dayRef: dayRef, list: list)
+            let item = GroceryItem(name: trimmedName, dayRef: dayRef, list: list)
             list.items.append(item)
             context.insert(item)
+        }
+        if list.items.isEmpty {
+            context.delete(list)
+            plan.groceryList = nil
+            return nil
         }
         return list
     }
@@ -387,12 +431,12 @@ final class DataManager {
         guard flags.notificationsGroceryCadence else { return }
         guard isCurrentWeek(plan) else { return }
         guard !list.items.isEmpty else { return }
-        groceryCadenceScheduler?.scheduleNudges(weekStart: plan.startDate, listId: list.id.uuidString)
+        groceryCadenceScheduler?.scheduleNudges(weekStart: plan.startDate, weekId: plan.id.uuidString)
     }
 
-    private func cancelGroceryCadence(for list: GroceryList) {
+    private func cancelGroceryCadence(for plan: WeeklyPlan) {
         guard flags.notificationsGroceryCadence else { return }
-        groceryCadenceScheduler?.cancelNudges(listId: list.id.uuidString)
+        groceryCadenceScheduler?.cancelNudges(weekId: plan.id.uuidString)
     }
 
     func updateBudgetTarget(for plan: WeeklyPlan, dollars: Int) {

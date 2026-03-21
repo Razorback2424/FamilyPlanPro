@@ -1,101 +1,200 @@
 # AGENTS.md
-Family Plan Pro — Operating Guide for Coding Agents
+Family Plan Pro — Working Guide for Coding Agents
 
-Goal
-Keep agents fast, safe, and stage-compliant. This file tells you what to read, how to run, what to change, and when to stop.
+## Mission
+Build the smallest useful version of Family Plan Pro quickly, while staying aligned with the repo's staged delivery plan.
 
-Read this first (in this order)
-1) README.md → repo purpose, local run, staged delivery overview
-2) STAGED_DELIVERY.md → active stage, acceptance criteria, gates
-3) VISION.md → product scope and non-goals
-4) ARCHITECTURE.md → module boundaries, services, flags, perf/accessibility budgets
-5) DATA_MODEL.md → entities, fields, invariants, migrations
-6) STATE_MACHINES.md → transitions, guards, side-effects, telemetry
+Optimize for:
+- a working local-first SwiftUI + SwiftData app
+- visible progress in small vertical slices
+- clarity, speed, and correctness over polish
+- a usable demo over completeness
+- minimal diffs that match the current stage
 
-Grounding sequence (do this before any work)
-- Build a short Grounding Map: list 5–10 binding constraints per doc with file → section.
-- Detect the active stage = first unchecked stage in STAGED_DELIVERY.md.
-- Extract that stage’s acceptance criteria verbatim (condensed) and the feature flags required.
-- Refuse out-of-stage changes; cite STAGED_DELIVERY.md.
+## Read First
+Read these before making changes:
+1. `README.md`
+2. `STAGED_DELIVERY.md`
+3. `VISION.md`
+4. `docs/tech/ARCHITECTURE.md`
+5. `docs/tech/DATA_MODEL.md`
+6. `docs/tech/STATE_MACHINES.md`
 
-Definition of Done (every change)
-- Satisfies one acceptance criterion of the active stage.
-- Behind the correct feature flag(s); safe default in release.
-- Tests added/updated (unit + UI smoke) and passing.
-- Performance budgets met (cold start ≤1s; Current Week render ≤200ms).
-- Accessibility passes (labels, Dynamic Type, contrast AA).
-- Docs updated in the same PR (CHANGELOG + any affected spec).
-- Demo script recorded that exercises the criterion in order.
+## Grounding Sequence
+Before substantial work:
+1. Build a short Grounding Map with binding constraints from the docs above.
+2. Detect the active stage as the first unchecked stage in `STAGED_DELIVERY.md`.
+3. Extract that stage's acceptance criteria and feature flags.
+4. Refuse or defer requests that are clearly out of stage unless the user explicitly asks for that tradeoff.
 
-What not to do (non-goals & safety rails)
-- No finance suite, grocery-provider integrations, or deep PM features in v1.
-- No calendar writes without explicit consent; export-only until the stage allows.
-- No analytics content logging; counts/durations only, opt-in default off.
-- No broad refactors; prefer minimal diffs that satisfy tests and gates.
+## Product Intent
+The app is a calm weekly coordination tool for a household.
 
-Project layout (source of truth)
-- App/  entry & navigation, feature flags
-- Features/  Meals, Chores, Events, Rituals, Quarterly
-- Services/  Persistence, Notifications, Calendar, Analytics, System
-- Data/  SwiftData models, migrations, seeders
-- Shared/  UI building blocks, design tokens
-- Tests/  Unit, UI, performance
-- docs/  vision/specs/quality
-- codex/  skills, automations, team config (if present)
+Right now, the codebase is centered on a weekly meal-planning loop:
+- one current-week `WeeklyPlan`
+- date-based `MealSlot`s
+- suggestion, review, conflict, and finalized states
+- optional Stage 1 additions behind feature flags
 
-Setup & common commands (adjust scheme/targets if needed)
-- Build (debug):  
-  `xcodebuild -scheme FamilyPlanPro -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 16' build`
-- Unit tests:  
-  `xcodebuild -scheme FamilyPlanPro -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 16' test`
-- UI tests (if separate scheme):  
-  `xcodebuild -scheme FamilyPlanProUITests -destination 'platform=iOS Simulator,name=iPhone 16' test`
-- Clean & reset demo data: provide an in-app Reset Demo; do not script destructive wipes.
+Do not treat this repo like a generic family organizer. Work from the current product slice already implemented here.
 
-Stage workflow (must follow)
-1) Plan only: produce a Gap Matrix (criterion → current evidence → delta → tests).
-2) Minimal diffs: implement one criterion at a time behind flags.
-3) Tests: run unit/UI after each diff; attach artifacts.
-4) Docs: tick the stage checklist and update CHANGELOG.
-5) Demo: record a 2–3 minute video that follows the acceptance criteria order.
+## Current Scope
+The existing app structure supports:
+- creating or bootstrapping a family and current week
+- entering meal suggestions
+- submitting for review
+- accepting or rejecting suggestions
+- conflict handling
+- finalized weekly meal summary
+- Stage 1 flags for ownership rules, grocery list, grocery cadence, and budget status
 
-Feature flags to know (examples; see docs for the full list)
-- Meals: `ff.meals.ownershipRules`, `ff.meals.groceryList`, `ff.meals.budgetStatus`
-- Notifications: `ff.notifications.groceryCadence`, `ff.notifications.chores`, `ff.rituals.dailyPreview`
-- Events/Calendar: `ff.events.core`, `ff.events.dateNightRotation`, `ff.calendar.hub`, `ff.projects.steps`
-- Rituals: `ff.rituals.weeklyConnection`, `ff.rituals.hardTopics`
-- Quarterly: `ff.quarterly.review`, `ff.quarterly.insights`
-- Sync: `ff.sync.sharing`, `ff.notifications.push`
+Prefer extending or hardening these flows over inventing unrelated new domains.
 
-Parallel work & worktrees
-- Use separate worktrees/branches per track to avoid conflicts (e.g., Stage1-Ownership, Stage1-Grocery).
-- Zero file overlap between tracks. If unavoidable, define a merge protocol in the PR description.
-- Human reviewer must approve diffs from each worktree before integration.
+## Explicitly Out of Scope Unless Requested
+Do not add these by default:
+- cloud sync or collaboration
+- authentication or accounts
+- external calendar providers
+- Apple Notes or Google integrations
+- AI suggestions
+- advanced theming/polish work
+- large architectural refactors
+- speculative abstractions for future domains
 
-Skills & automations (optional, if present under codex/)
-- skills/TEST_RUNNER → runs unit/UI/perf suites and attaches artifacts
-- skills/RELEASE_BRIEFS → drafts PR notes from CHANGELOG and merged diffs
-- skills/CALENDAR_SYNC → export-only operations; never write without consent
-- automations/CI_FAILURE_DIGEST → summarizes failing tests; never auto-push fixes
-Invoke skills by name when relevant; otherwise keep runs lean.
+When in doubt, cut scope.
 
-Ask policy (ambiguity handling)
-- If a requirement is missing or contradictory, ask exactly one clarifying question with a proposed minimal patch to the docs (unified diff snippet), then wait.
+## Architecture Rules
+Match the codebase that exists today.
 
-Refusal policy
-- If a request violates stage, safety, privacy, or non-goals, refuse and cite the source file/section. Offer the closest in-stage alternative.
+Current implementation is centered in:
+- `FamilyPlanPro/Models.swift`
+- `FamilyPlanPro/DataManager.swift`
+- `FamilyPlanPro/Views/`
+- `FamilyPlanPro/Notifications/`
+- `FamilyPlanProTests/`
+- `FamilyPlanProUITests/`
 
-PR checklist (attach in every PR)
-- Demo video covering acceptance criteria in order
-- Test results (unit/UI), perf logs, accessibility screenshots
-- Migration notes (if schema changed)
-- CHANGELOG entry + any spec updates
-- Requirements Traceability Matrix: criterion → code diffs → tests
+Prefer:
+- SwiftUI views with straightforward state ownership
+- SwiftData models and direct CRUD
+- `DataManager` for the workflow and persistence logic already living there
+- `@Query` and `modelContext` where they keep things simple
+- feature-flagged changes for staged work
 
-Personality & style
-- `/personality terse` unless writing user-facing copy; then be warm and brief.
-- Keep diffs minimal and well-commented; avoid sweeping reorganizations.
+Avoid adding unless clearly required:
+- repository layers
+- protocol-heavy service splits
+- generic base views/view models
+- dependency injection frameworks
+- coordinator patterns
 
-Begin every run by producing the Grounding Map, the Active Stage Gate, and a short plan. Refuse to proceed without them.
+## Data Model Rules
+Work with the current persisted model surface unless the task requires a schema change:
+- `Family`
+- `User`
+- `WeeklyPlan`
+- `OwnershipRulesSnap`
+- `MealSlot`
+- `MealSuggestion`
+- `GroceryList`
+- `GroceryItem`
 
-Why this file: Codex prioritizes AGENTS.md as the project’s “rules of the road” and merges it with Skills and Team Config. The desktop app’s parallel threads and worktrees are first-class, so encoding stage gates, flags, test/PR artifacts, and refusal policy here makes agent output reliably doc-grounded and reviewable.
+Do not collapse the current model into a generic MVP schema like `PlanItem` unless the user explicitly asks for a redesign.
+
+Keep schema changes small, stage-aligned, and migration-conscious.
+
+## Slice-First Policy
+Always implement in small vertical slices.
+
+A good slice:
+- produces visible user value
+- fits one acceptance criterion or one bug fix
+- is testable or at least directly verifiable
+- does not require reworking the whole app first
+
+Prefer slices like:
+- fix a broken navigation or workflow transition
+- harden grocery-list generation for finalized weeks
+- repair a feature-flag fallback path
+- add targeted unit/UI coverage for an existing state-machine edge case
+
+Avoid horizontal plans like:
+- redesign all models first
+- rewrite all views first
+- broad cleanup without user value
+
+## Planning Policy
+If a task is ambiguous, risky, or larger than one slice:
+1. identify the smallest acceptable scope
+2. state what is intentionally deferred
+3. implement only the next slice
+
+If the task is obviously larger than the active stage, say so and narrow it.
+
+## Subagent Policy
+Use subagents only when they reduce uncertainty for a bounded task.
+
+Good uses:
+- codebase exploration
+- doc/spec comparison
+- finding regressions or test gaps
+- bounded review after implementation
+
+Avoid:
+- overlapping writes to the same files
+- parallel architecture invention
+- multiple agents coding the same slice
+
+Default rule:
+- many agents may analyze
+- one agent owns the actual code slice
+
+## Definition Of Done
+A slice is done when:
+- it satisfies the intended bug fix or acceptance criterion
+- it compiles, or is as close to compile-ready as possible
+- persistence behavior is correct if data is touched
+- relevant tests are added or updated when practical
+- feature-flag behavior remains safe
+- scope stayed narrow
+- intentional deferrals are stated clearly
+- no unnecessary abstractions were introduced
+
+## Build And Verification
+Before concluding work:
+- review changed files for accidental complexity
+- verify the user-facing flow
+- check for obvious SwiftUI and SwiftData mistakes
+- note blockers, assumptions, or follow-up work
+
+When practical, run the relevant command:
+- Build: `xcodebuild -scheme FamilyPlanPro -configuration Debug -destination 'generic/platform=iOS Simulator' build`
+- Tests: `xcodebuild -scheme FamilyPlanPro -configuration Debug -destination 'generic/platform=iOS Simulator' test`
+
+If a build or test run cannot be completed, say so explicitly.
+
+## Output Expectations
+When finishing a task, report:
+1. what changed
+2. what user-visible behavior now works
+3. what was intentionally deferred
+4. any blockers or risks
+5. the next recommended slice
+
+Keep summaries concrete and brief.
+
+## Decision Rules
+When multiple approaches are possible, prefer the one that:
+- has the smallest implementation cost
+- has the lowest schema and migration risk
+- preserves the current staged architecture
+- reaches a working demo fastest
+- is easiest to revise tomorrow
+
+Do not optimize for elegance over shippability.
+
+## Style
+- Keep diffs minimal.
+- Preserve the current product vocabulary and flow.
+- Prefer strengthening the current meal-planning workflow over introducing new surface area.
+- Be terse in engineering communication unless writing user-facing copy.

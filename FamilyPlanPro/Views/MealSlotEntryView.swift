@@ -29,6 +29,11 @@ struct MealSlotEntryView: View {
                 Text(slot.date, format: .dateTime.month().day())
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let owner = slot.owner {
+                    Text("Default owner: \(owner.name)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if slot.isSimple {
                     Text("Simple Friday")
                         .font(.caption)

@@ -8,6 +8,8 @@ struct FinalizedView: View {
     @Environment(\.notificationScheduler) private var notificationScheduler
     @Bindable var plan: WeeklyPlan
     @State private var showReopenConfirmation = false
+    @State private var budgetTarget = ""
+    @State private var observedSpend = ""
 
     private var cadenceScheduler: GroceryCadenceScheduler {
         GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
@@ -38,6 +40,33 @@ struct FinalizedView: View {
                     Text(cadenceStatusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if featureFlags.mealsBudgetStatus {
+                Section("Budget") {
+                    Text("Status: \(plan.budgetStatus.rawValue.capitalized)")
+                        .font(.subheadline)
+                        .accessibilityIdentifier("budget-status-label")
+                    TextField("Weekly budget ($)", text: $budgetTarget)
+                        .keyboardType(.numberPad)
+                    TextField("Observed spend ($)", text: $observedSpend)
+                        .keyboardType(.numberPad)
+                    Button("Update Budget") {
+                        let manager = DataManager(context: context,
+                                                  flags: featureFlags,
+                                                  groceryCadenceScheduler: cadenceScheduler)
+                        manager.updateBudgetTarget(for: plan, dollars: Int(budgetTarget) ?? 0)
+                        manager.updateObservedBudget(for: plan, dollars: Int(observedSpend) ?? 0)
+                        try? context.save()
+                        syncBudgetFields()
+                    }
+                    .disabled(plan.groceryList == nil)
+                    if plan.groceryList == nil {
+                        Text("Finalize meals to create a grocery list before entering spend.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -81,6 +110,15 @@ struct FinalizedView: View {
         } message: {
             Text("This will return the week to Suggestions mode.")
         }
+        .onAppear {
+            syncBudgetFields()
+        }
+        .onChange(of: plan.budgetTargetCents) { _, _ in
+            syncBudgetFields()
+        }
+        .onChange(of: plan.groceryList?.budgetObservedCents) { _, _ in
+            syncBudgetFields()
+        }
     }
 
     private var cadenceStatusText: String {
@@ -95,6 +133,15 @@ struct FinalizedView: View {
             return "Grocery reminders not scheduled (empty list)."
         }
         return "Grocery reminders scheduled (Sun/Thu)."
+    }
+
+    private func syncBudgetFields() {
+        budgetTarget = plan.budgetTargetCents > 0 ? String(plan.budgetTargetCents / 100) : ""
+        if let observed = plan.groceryList?.budgetObservedCents, observed > 0 {
+            observedSpend = String(observed / 100)
+        } else {
+            observedSpend = ""
+        }
     }
 }
 

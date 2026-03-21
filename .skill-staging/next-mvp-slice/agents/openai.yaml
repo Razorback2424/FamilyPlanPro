@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next MVP Slice"
+  short_description: "Implement one next repo-planned MVP slice"
+  default_prompt: "Use $next-mvp-slice to implement the next unfinished Family Plan Pro MVP slice from the current repo plan."

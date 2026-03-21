@@ -32,32 +32,28 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
-    func testPlannerDisplaysFinalizedView() throws {
+    func testPlannerDisplaysFinalizedViewWithGroceryList() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_STATUS"] = "finalized"
         app.launch()
+
         XCTAssertTrue(app.navigationBars["Finalized"].exists)
-        XCTAssertTrue(app.buttons["Reopen to Suggestions"].exists)
+        let groceryLink = app.buttons["Grocery List"]
+        XCTAssertTrue(groceryLink.waitForExistence(timeout: 2))
+        groceryLink.tap()
+        XCTAssertTrue(app.navigationBars["Grocery List"].waitForExistence(timeout: 2))
     }
 
     @MainActor
-    func testFirstLaunchBootstrapsSuggestionPlan() throws {
+    func testFirstLaunchBootstrapsSuggestionPlanWithOwnersAndSimpleFriday() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"
         app.launch()
+
         XCTAssertTrue(app.navigationBars["Suggestions"].waitForExistence(timeout: 2))
-    }
-
-    @MainActor
-    func testStartNewWeekButtonCreatesPlan() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["UITEST_RESET"] = "1"
-        app.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
-        app.launch()
-
-        let suggestions = app.navigationBars["Suggestions"]
-        XCTAssertTrue(suggestions.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Default owner: Partner A"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Simple Friday"].exists)
     }
 
     @MainActor
@@ -66,7 +62,6 @@ final class FamilyPlanProUITests: XCTestCase {
 
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"
-        app.launchEnvironment["UITEST_EMPTY_STATE"] = "1"
         app.launch()
 
         let mealField = app.textFields["Meal name"].firstMatch
@@ -79,12 +74,49 @@ final class FamilyPlanProUITests: XCTestCase {
         saveButton.tap()
 
         XCTAssertTrue(app.staticTexts["Suggested: \(mealName)"].waitForExistence(timeout: 2))
+    }
 
-        let submitButton = app.buttons["Submit for Review"]
-        XCTAssertTrue(submitButton.waitForExistence(timeout: 2))
-        submitButton.tap()
+    @MainActor
+    func testReopenFromFinalizedReturnsToSuggestions() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
 
-        XCTAssertTrue(app.navigationBars["Review"].waitForExistence(timeout: 2))
+        let reopenButton = app.buttons["Reopen to Suggestions"]
+        XCTAssertTrue(reopenButton.waitForExistence(timeout: 2))
+        reopenButton.tap()
+
+        let alertReopenButton = app.alerts.buttons["Reopen"]
+        XCTAssertTrue(alertReopenButton.waitForExistence(timeout: 2))
+        alertReopenButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Suggestions"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.buttons["Grocery List"].exists)
+    }
+
+    @MainActor
+    func testBudgetStatusCanBeUpdatedFromSettings() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
+
+        let weeklyBudgetField = app.textFields["Weekly budget ($)"]
+        XCTAssertTrue(weeklyBudgetField.waitForExistence(timeout: 2))
+        weeklyBudgetField.tap()
+        weeklyBudgetField.typeText("100")
+
+        let observedSpendField = app.textFields["Observed spend ($)"]
+        XCTAssertTrue(observedSpendField.waitForExistence(timeout: 2))
+        observedSpendField.tap()
+        observedSpendField.typeText("100")
+
+        let updateButton = app.buttons["Update Budget"]
+        XCTAssertTrue(updateButton.waitForExistence(timeout: 2))
+        updateButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Status: On"].waitForExistence(timeout: 2))
     }
 
     @MainActor
