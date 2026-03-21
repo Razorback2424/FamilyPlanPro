@@ -7,6 +7,7 @@ final class WorkflowTests: XCTestCase {
     private final class RecordingNotificationScheduler: NotificationScheduler {
         var authorizationRequests = 0
         var scheduled: [String] = []
+        var scheduledDates: [String: Date] = [:]
         var cancelled: [String] = []
 
         func requestAuthorization() {
@@ -15,6 +16,7 @@ final class WorkflowTests: XCTestCase {
 
         func schedule(id: String, at date: Date, title: String, body: String) {
             scheduled.append(id)
+            scheduledDates[id] = date
         }
 
         func cancel(ids: [String]) {
@@ -346,6 +348,49 @@ final class WorkflowTests: XCTestCase {
 
         XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-sun"))
         XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-thu"))
+    }
+
+    func testGroceryCadenceSchedulerSchedulesBothDaysBeforeSundayRun() {
+        let scheduler = RecordingNotificationScheduler()
+        let calendar = Calendar.current
+        let weekStart = calendar.startOfWeek(for: Date())
+        let beforeSundayRun = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: weekStart)!
+        let cadence = GroceryCadenceScheduler(scheduler: scheduler, now: { beforeSundayRun })
+
+        cadence.scheduleNudges(weekStart: weekStart, weekId: "week-1")
+
+        XCTAssertEqual(scheduler.authorizationRequests, 1)
+        XCTAssertEqual(Set(scheduler.scheduled), ["grocery-week-1-sun", "grocery-week-1-thu"])
+    }
+
+    func testGroceryCadenceSchedulerSchedulesOnlyThursdayAfterSundayRun() {
+        let scheduler = RecordingNotificationScheduler()
+        let calendar = Calendar.current
+        let weekStart = calendar.startOfWeek(for: Date())
+        let sundayEvening = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: weekStart)!
+        let cadence = GroceryCadenceScheduler(scheduler: scheduler, now: { sundayEvening })
+
+        cadence.scheduleNudges(weekStart: weekStart, weekId: "week-2")
+
+        XCTAssertEqual(scheduler.authorizationRequests, 1)
+        XCTAssertEqual(scheduler.scheduled, ["grocery-week-2-thu"])
+        XCTAssertNil(scheduler.scheduledDates["grocery-week-2-sun"])
+    }
+
+    func testGroceryCadenceSchedulerSchedulesNothingAfterThursdayRun() {
+        let scheduler = RecordingNotificationScheduler()
+        let calendar = Calendar.current
+        let weekStart = calendar.startOfWeek(for: Date())
+        let thursday = calendar.date(byAdding: .day, value: 4, to: weekStart)!
+        let afterThursdayRun = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: thursday)!
+        let cadence = GroceryCadenceScheduler(scheduler: scheduler, now: { afterThursdayRun })
+
+        cadence.scheduleNudges(weekStart: weekStart, weekId: "week-3")
+
+        XCTAssertEqual(scheduler.authorizationRequests, 1)
+        XCTAssertTrue(scheduler.scheduled.isEmpty)
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-week-3-sun"))
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-week-3-thu"))
     }
 
     func testBudgetStatusTransitions() throws {
