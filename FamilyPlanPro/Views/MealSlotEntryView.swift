@@ -2,20 +2,6 @@ import SwiftUI
 import SwiftData
 import Observation
 
-enum ResponsibleSelection: Hashable {
-    case unassigned
-    case user(UUID)
-
-    var responsibleID: UUID? {
-        switch self {
-        case .unassigned:
-            return nil
-        case .user(let id):
-            return id
-        }
-    }
-}
-
 struct MealSlotEntryView: View {
     @Bindable var slot: MealSlot
     var members: [User]
@@ -37,6 +23,19 @@ struct MealSlotEntryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(slot.date, format: .dateTime.weekday(.wide)) \(slot.mealType.displayName)")
+                    .font(.headline)
+                Text(slot.date, format: .dateTime.month().day())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if slot.isSimple {
+                    Text("Simple Friday")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             TextField("Meal name", text: $mealName)
                 .textFieldStyle(.roundedBorder)
 
@@ -66,16 +65,19 @@ struct MealSlotEntryView_Previews: PreviewProvider {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: [config])
         let manager = DataManager(context: container.mainContext)
         let family = manager.createFamily(name: "Preview")
         _ = manager.addUser(name: "Alice", to: family)
-        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        let plan = manager.createCurrentWeekPlan(for: family)
+        let slot = plan.slots.first!
         try? container.mainContext.save()
 
         struct PreviewWrapper: View {

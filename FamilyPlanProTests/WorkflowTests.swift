@@ -8,8 +8,11 @@ final class WorkflowTests: XCTestCase {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -45,8 +48,11 @@ final class WorkflowTests: XCTestCase {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -82,8 +88,11 @@ final class WorkflowTests: XCTestCase {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
@@ -223,5 +232,140 @@ final class WorkflowTests: XCTestCase {
         let startOfThisWeek = calendar.startOfWeek(for: Date())
         let found = plans.first { calendar.isDate($0.startDate, equalTo: startOfThisWeek, toGranularity: .day) }
         XCTAssertNotNil(found)
+    }
+
+    func testBootstrapCreatesCurrentWeekWithSevenDinnerSlots() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            OwnershipRulesSnap.self,
+            MealSlot.self,
+            MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+
+        let family = manager.getOrCreateDefaultFamily()
+        let plan = manager.getOrCreateCurrentWeekPlan(for: family)
+
+        let dinnerSlots = plan.slots.filter { $0.mealType == .dinner }
+        XCTAssertEqual(dinnerSlots.count, 7)
+        XCTAssertEqual(plan.status, .suggestionMode)
+    }
+
+    func testReopenToSuggestionFromReviewAndFinalized() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            OwnershipRulesSnap.self,
+            MealSlot.self,
+            MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+
+        manager.submitPlanForReview(plan, by: userA)
+        manager.reopenPlanToSuggestion(plan)
+        XCTAssertEqual(plan.status, .suggestionMode)
+
+        plan.status = .finalized
+        manager.reopenPlanToSuggestion(plan)
+        XCTAssertEqual(plan.status, .suggestionMode)
+    }
+
+    func testReplacingSuggestionsDoesNotLeaveOrphans() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            OwnershipRulesSnap.self,
+            MealSlot.self,
+            MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+        let slot = manager.addMealSlot(date: .now, type: .dinner, to: plan)
+
+        _ = manager.setPendingSuggestion(title: "Pasta", user: userA, for: slot)
+        _ = manager.setPendingSuggestion(title: "Soup", user: userA, for: slot)
+        XCTAssertEqual(slot.pendingSuggestion?.title, "Soup")
+
+        manager.acceptPendingSuggestion(in: slot)
+        _ = manager.setPendingSuggestion(title: "Salad", user: userA, for: slot)
+
+        let suggestions = try container.mainContext.fetch(FetchDescriptor<MealSuggestion>())
+        XCTAssertEqual(suggestions.count, 1)
+        XCTAssertEqual(slot.pendingSuggestion?.title, "Salad")
+        XCTAssertNil(slot.finalizedSuggestion)
+    }
+
+    func testDeletingMealSlotCleansSuggestions() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            OwnershipRulesSnap.self,
+            MealSlot.self,
+            MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+        let slot = manager.addMealSlot(date: .now, type: .dinner, to: plan)
+
+        _ = manager.setPendingSuggestion(title: "Tacos", user: userA, for: slot)
+        manager.acceptPendingSuggestion(in: slot)
+        manager.deleteMealSlot(slot)
+
+        let suggestions = try container.mainContext.fetch(FetchDescriptor<MealSuggestion>())
+        XCTAssertEqual(suggestions.count, 0)
+    }
+
+    func testDeletingWeeklyPlanCleansSlotsAndSuggestions() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+            WeeklyPlan.self,
+            MealSlot.self,
+            MealSuggestion.self,
+        ])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
+        let slot = manager.addMealSlot(date: .now, type: .dinner, to: plan)
+        _ = manager.setPendingSuggestion(title: "Pizza", user: userA, for: slot)
+        manager.acceptPendingSuggestion(in: slot)
+
+        container.mainContext.delete(plan)
+
+        let slots = try container.mainContext.fetch(FetchDescriptor<MealSlot>())
+        let suggestions = try container.mainContext.fetch(FetchDescriptor<MealSuggestion>())
+        XCTAssertEqual(slots.count, 0)
+        XCTAssertEqual(suggestions.count, 0)
     }
 }

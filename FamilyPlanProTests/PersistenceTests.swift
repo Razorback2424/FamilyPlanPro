@@ -8,8 +8,11 @@ final class PersistenceTests: XCTestCase {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Test.sqlite")
         var config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

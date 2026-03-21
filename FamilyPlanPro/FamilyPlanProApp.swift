@@ -11,14 +11,31 @@ import Foundation
 
 @main
 struct FamilyPlanProApp: App {
+    private let stageFeatureFlags = FeatureFlags(
+        mealsOwnershipRules: true,
+        mealsGroceryList: true,
+        notificationsGroceryCadence: true,
+        mealsBudgetStatus: true
+    )
+
+    private let notificationScheduler: NotificationScheduler = UNNotificationScheduler()
+    @State private var featureFlagsStore: FeatureFlagsStore
+
+    init() {
+        _featureFlagsStore = State(initialValue: FeatureFlagsStore(flags: stageFeatureFlags))
+    }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
 
         let fileManager = FileManager.default
@@ -38,13 +55,10 @@ struct FamilyPlanProApp: App {
         do {
             return try makeContainer()
         } catch {
-            // If a migration or schema mismatch prevents loading the store, wipe and recreate it.
             if fileManager.fileExists(atPath: storeURL.path) {
                 try? fileManager.removeItem(at: storeURL)
-                let shmURL = URL(fileURLWithPath: storeURL.path + "-shm")
-                let walURL = URL(fileURLWithPath: storeURL.path + "-wal")
-                try? fileManager.removeItem(at: shmURL)
-                try? fileManager.removeItem(at: walURL)
+                try? fileManager.removeItem(at: URL(fileURLWithPath: storeURL.path + "-shm"))
+                try? fileManager.removeItem(at: URL(fileURLWithPath: storeURL.path + "-wal"))
             }
 
             do {
@@ -58,6 +72,9 @@ struct FamilyPlanProApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
+                .environment(\.featureFlags, featureFlagsStore.flags)
+                .environment(featureFlagsStore)
+                .environment(\.notificationScheduler, NotificationSchedulerProvider(scheduler: notificationScheduler))
                 .onAppear {
                     let environment = ProcessInfo.processInfo.environment
                     if environment["UITEST_RESET"] == "1" {
@@ -69,9 +86,35 @@ struct FamilyPlanProApp: App {
                               let status = PlanStatus(rawValue: statusString) {
                         seedData(for: status)
                     }
+                    if let override = environment["FEATURE_FLAGS"] {
+                        applyFeatureFlagOverride(override)
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    private func applyFeatureFlagOverride(_ override: String) {
+        let pairs = override.split(separator: ",")
+        for pair in pairs {
+            let parts = pair.split(separator: "=")
+            guard parts.count == 2 else { continue }
+            let key = parts[0].trimmingCharacters(in: .whitespaces)
+            let value = parts[1].trimmingCharacters(in: .whitespaces)
+            let enabled = value.lowercased() == "true"
+            switch key {
+            case "ff.meals.ownershipRules":
+                featureFlagsStore.flags.mealsOwnershipRules = enabled
+            case "ff.meals.groceryList":
+                featureFlagsStore.flags.mealsGroceryList = enabled
+            case "ff.notifications.groceryCadence":
+                featureFlagsStore.flags.notificationsGroceryCadence = enabled
+            case "ff.meals.budgetStatus":
+                featureFlagsStore.flags.mealsBudgetStatus = enabled
+            default:
+                continue
+            }
+        }
     }
 
     private func resetData() {
@@ -83,16 +126,16 @@ struct FamilyPlanProApp: App {
     }
 
     private func seedData(for status: PlanStatus) {
-        let manager = DataManager(context: sharedModelContainer.mainContext)
+        let cadence = GroceryCadenceScheduler(scheduler: notificationScheduler)
+        let manager = DataManager(context: sharedModelContainer.mainContext,
+                                  flags: featureFlagsStore.flags,
+                                  groceryCadenceScheduler: cadence)
         let family = manager.createFamily(name: "UITest")
         let userA = manager.addUser(name: "Alice", to: family)
         let userB = manager.addUser(name: "Bob", to: family)
-        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
-        _ = manager.setPendingSuggestion(mealName: "Test",
-                                         responsibleUser: userA,
-                                         author: userA,
-                                         for: slot)
+        let plan = manager.getOrCreateCurrentWeekPlan(for: family)
+        guard let slot = plan.slots.first else { return }
+        _ = manager.setPendingSuggestion(title: "Test", user: userA, for: slot)
 
         switch status {
         case .reviewMode:
@@ -100,6 +143,12 @@ struct FamilyPlanProApp: App {
         case .finalized:
             manager.submitPlanForReview(plan, by: userA)
             manager.acceptPendingSuggestion(in: slot)
+            for remainingSlot in plan.slots.dropFirst() {
+                _ = manager.setPendingSuggestion(title: "Meal \(remainingSlot.id.uuidString.prefix(4))",
+                                                 user: userA,
+                                                 for: remainingSlot)
+                manager.acceptPendingSuggestion(in: remainingSlot)
+            }
             manager.finalizeIfPossible(plan)
         case .conflict:
             manager.submitPlanForReview(plan, by: userA)
@@ -136,4 +185,3 @@ struct FamilyPlanProApp: App {
         try? manager.save()
     }
 }
-

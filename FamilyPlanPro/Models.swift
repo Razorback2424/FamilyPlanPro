@@ -46,6 +46,16 @@ final class Family {
         self.id = id
         self.name = name
     }
+
+    var users: [User] {
+        get { members }
+        set { members = newValue }
+    }
+
+    var plans: [WeeklyPlan] {
+        get { weeklyPlans }
+        set { weeklyPlans = newValue }
+    }
 }
 
 @Model
@@ -62,6 +72,45 @@ final class User {
 }
 
 @Model
+final class OwnershipRulesSnap {
+    var rulesJSON: String
+    var fridaySimple: Bool
+    weak var family: Family?
+    weak var plan: WeeklyPlan?
+
+    init(rules: [String: String] = [:],
+         fridaySimple: Bool = true,
+         family: Family? = nil,
+         plan: WeeklyPlan? = nil) {
+        self.rulesJSON = OwnershipRulesSnap.encodeRules(rules)
+        self.fridaySimple = fridaySimple
+        self.family = family
+        self.plan = plan
+    }
+
+    var rules: [String: String] {
+        get { OwnershipRulesSnap.decodeRules(rulesJSON) }
+        set { rulesJSON = OwnershipRulesSnap.encodeRules(newValue) }
+    }
+
+    private static func encodeRules(_ rules: [String: String]) -> String {
+        guard let data = try? JSONEncoder().encode(rules),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return json
+    }
+
+    private static func decodeRules(_ json: String) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+}
+
+@Model
 final class WeeklyPlan {
     var id: UUID
     var startDate: Date
@@ -69,7 +118,11 @@ final class WeeklyPlan {
     var lastModifiedByUserID: UUID?
     var reviewInitiatorUserID: UUID?
     weak var family: Family?
-    @Relationship(deleteRule: .cascade) var mealSlots: [MealSlot] = []
+    @Relationship(deleteRule: .cascade) var slots: [MealSlot] = []
+    @Relationship(deleteRule: .cascade) var ownershipRulesSnap: OwnershipRulesSnap?
+    @Relationship(deleteRule: .cascade) var groceryList: GroceryList?
+    var budgetTargetCents: Int
+    var budgetStatus: BudgetStatus
 
     init(id: UUID = UUID(),
          startDate: Date,
@@ -83,26 +136,51 @@ final class WeeklyPlan {
         self.lastModifiedByUserID = lastModifiedByUserID
         self.reviewInitiatorUserID = reviewInitiatorUserID
         self.family = family
+        self.budgetTargetCents = 0
+        self.budgetStatus = .unset
     }
+
+    var mealSlots: [MealSlot] {
+        get { slots }
+        set { slots = newValue }
+    }
+}
+
+enum BudgetStatus: String, Codable {
+    case unset
+    case under
+    case on
+    case over
 }
 
 @Model
 final class MealSlot {
     var id: UUID
-    var dayOfWeek: DayOfWeek
+    var date: Date
     var mealType: MealType
+    var isSimple: Bool
+    weak var owner: User?
     weak var plan: WeeklyPlan?
     @Relationship(deleteRule: .cascade) var finalizedSuggestion: MealSuggestion?
     @Relationship(deleteRule: .cascade) var pendingSuggestion: MealSuggestion?
 
     init(id: UUID = UUID(),
-         dayOfWeek: DayOfWeek,
+         date: Date,
          mealType: MealType,
+         isSimple: Bool = false,
+         owner: User? = nil,
          plan: WeeklyPlan? = nil) {
         self.id = id
-        self.dayOfWeek = dayOfWeek
+        self.date = date
         self.mealType = mealType
+        self.isSimple = isSimple
+        self.owner = owner
         self.plan = plan
+    }
+
+    var dayOfWeek: DayOfWeek {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return DayOfWeek(rawValue: weekday) ?? .monday
     }
 }
 
@@ -128,5 +206,52 @@ final class MealSuggestion {
         self.reasonForChange = reasonForChange
         self.slot = slot
     }
+
+    var title: String {
+        get { mealName }
+        set { mealName = newValue }
+    }
 }
 
+@Model
+final class GroceryList {
+    enum Status: String, Codable {
+        case draft
+        case ready
+        case ordered
+    }
+
+    var id: UUID
+    var status: Status
+    var budgetObservedCents: Int
+    weak var plan: WeeklyPlan?
+    @Relationship(deleteRule: .cascade) var items: [GroceryItem] = []
+
+    init(id: UUID = UUID(),
+         status: Status = .draft,
+         budgetObservedCents: Int = 0,
+         plan: WeeklyPlan? = nil) {
+        self.id = id
+        self.status = status
+        self.budgetObservedCents = budgetObservedCents
+        self.plan = plan
+    }
+}
+
+@Model
+final class GroceryItem {
+    var name: String
+    var dayRef: Date?
+    var checked: Bool
+    weak var list: GroceryList?
+
+    init(name: String,
+         dayRef: Date? = nil,
+         checked: Bool = false,
+         list: GroceryList? = nil) {
+        self.name = name
+        self.dayRef = dayRef
+        self.checked = checked
+        self.list = list
+    }
+}

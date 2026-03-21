@@ -4,6 +4,8 @@ import Observation
 
 struct MealSlotReviewView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.featureFlags) private var featureFlags
+    @Environment(\.notificationScheduler) private var notificationScheduler
     @Bindable var slot: MealSlot
     @Bindable var plan: WeeklyPlan
     var members: [User]
@@ -20,14 +22,18 @@ struct MealSlotReviewView: View {
         return nil
     }
 
+    private var cadenceScheduler: GroceryCadenceScheduler {
+        GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
+    }
+
     private func userName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return members.first(where: { $0.id == id })?.name
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(slot.date, format: .dateTime.weekday(.wide)) \(slot.mealType.displayName)")
                 .font(.headline)
             if let pending = slot.pendingSuggestion {
                 Text(pending.mealName)
@@ -37,7 +43,9 @@ struct MealSlotReviewView: View {
                 }
                 HStack {
                     Button("Accept") {
-                        let manager = DataManager(context: context)
+                        let manager = DataManager(context: context,
+                                                 flags: featureFlags,
+                                                 groceryCadenceScheduler: cadenceScheduler)
                         manager.acceptPendingSuggestion(in: slot)
                         manager.finalizeIfPossible(plan)
                         try? context.save()
@@ -71,7 +79,9 @@ struct MealSlotReviewView: View {
                         TextField("Reason (optional)", text: $reason)
                     }
                     Button("Submit") {
-                        let manager = DataManager(context: context)
+                        let manager = DataManager(context: context,
+                                                 flags: featureFlags,
+                                                 groceryCadenceScheduler: cadenceScheduler)
                         _ = manager.rejectPendingSuggestion(in: slot,
                                                            newMealName: newTitle,
                                                            author: reviewer,
@@ -104,16 +114,19 @@ struct MealSlotReviewView_Previews: PreviewProvider {
             Family.self,
             User.self,
             WeeklyPlan.self,
+            OwnershipRulesSnap.self,
             MealSlot.self,
             MealSuggestion.self,
+            GroceryList.self,
+            GroceryItem.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: [config])
         let manager = DataManager(context: container.mainContext)
         let family = manager.createFamily(name: "Preview")
         let userA = manager.addUser(name: "Alice", to: family)
-        let plan = manager.createWeeklyPlan(startDate: .now, for: family)
-        let slot = manager.addMealSlot(dayOfWeek: .monday, mealType: .breakfast, to: plan)
+        let plan = manager.createCurrentWeekPlan(for: family)
+        let slot = plan.slots.first!
         _ = manager.setPendingSuggestion(mealName: "Eggs",
                                          responsibleUser: userA,
                                          author: userA,
@@ -124,4 +137,3 @@ struct MealSlotReviewView_Previews: PreviewProvider {
             .modelContainer(container)
     }
 }
-
