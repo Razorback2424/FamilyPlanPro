@@ -271,6 +271,83 @@ final class WorkflowTests: XCTestCase {
         XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-thu"))
     }
 
+    func testReconcileGroceryCadenceCancelsWhenListBecomesEmpty() throws {
+        let container = try makeContainer()
+        let scheduler = RecordingNotificationScheduler()
+        let manager = DataManager(context: container.mainContext,
+                                  flags: makeStage1Flags(),
+                                  groceryCadenceScheduler: GroceryCadenceScheduler(scheduler: scheduler))
+        let family = manager.createFamily(name: "Test")
+        let reviewer = manager.addUser(name: "Alice", to: family)
+        _ = manager.addUser(name: "Bob", to: family)
+
+        let plan = manager.getOrCreateCurrentWeekPlan(for: family)
+        finalizeCurrentWeek(plan: plan, manager: manager, reviewer: reviewer)
+        let items = plan.groceryList?.items ?? []
+        for item in items {
+            container.mainContext.delete(item)
+        }
+        plan.groceryList?.items.removeAll()
+
+        manager.reconcileGroceryCadence(for: plan)
+
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-sun"))
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-thu"))
+    }
+
+    func testReconcileGroceryCadenceCancelsForNonCurrentWeekPlan() throws {
+        let container = try makeContainer()
+        let scheduler = RecordingNotificationScheduler()
+        let manager = DataManager(context: container.mainContext,
+                                  flags: makeStage1Flags(),
+                                  groceryCadenceScheduler: GroceryCadenceScheduler(scheduler: scheduler))
+        let family = manager.createFamily(name: "Test")
+        let reviewer = manager.addUser(name: "Alice", to: family)
+        _ = manager.addUser(name: "Bob", to: family)
+
+        let lastWeekStart = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfWeek(for: .now))!
+        let plan = manager.createWeeklyPlan(startDate: lastWeekStart, for: family)
+        for dayOffset in 0..<7 {
+            let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: lastWeekStart)!
+            _ = manager.addMealSlot(date: date, type: .dinner, to: plan)
+        }
+        finalizeCurrentWeek(plan: plan, manager: manager, reviewer: reviewer)
+
+        XCTAssertNotNil(plan.groceryList)
+        manager.reconcileGroceryCadence(for: plan)
+
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-sun"))
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-thu"))
+    }
+
+    func testReconcileGroceryCadenceCancelsWhenCadenceFlagTurnsOff() throws {
+        let container = try makeContainer()
+        let scheduler = RecordingNotificationScheduler()
+        let enabledManager = DataManager(context: container.mainContext,
+                                         flags: makeStage1Flags(),
+                                         groceryCadenceScheduler: GroceryCadenceScheduler(scheduler: scheduler))
+        let family = enabledManager.createFamily(name: "Test")
+        let reviewer = enabledManager.addUser(name: "Alice", to: family)
+        _ = enabledManager.addUser(name: "Bob", to: family)
+
+        let plan = enabledManager.getOrCreateCurrentWeekPlan(for: family)
+        finalizeCurrentWeek(plan: plan, manager: enabledManager, reviewer: reviewer)
+
+        let disabledFlags = FeatureFlags(
+            mealsOwnershipRules: true,
+            mealsGroceryList: true,
+            notificationsGroceryCadence: false,
+            mealsBudgetStatus: true
+        )
+        let disabledManager = DataManager(context: container.mainContext,
+                                          flags: disabledFlags,
+                                          groceryCadenceScheduler: GroceryCadenceScheduler(scheduler: scheduler))
+        disabledManager.reconcileGroceryCadence(for: plan)
+
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-sun"))
+        XCTAssertTrue(scheduler.cancelled.contains("grocery-\(plan.id.uuidString)-thu"))
+    }
+
     func testBudgetStatusTransitions() throws {
         let container = try makeContainer()
         let manager = DataManager(context: container.mainContext, flags: makeStage1Flags())

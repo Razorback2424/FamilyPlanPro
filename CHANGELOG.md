@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Cancel stale Sun/Thu grocery cadence notifications whenever a grocery list becomes ineligible for the current week.
 - Stage 1: Add grocery-list accessibility hooks and a UI smoke path for grouped sections plus manual item edits.
 - Stage 1: Hide ownership-rule and Simple Friday UI affordances when meal ownership rules are turned off.
 - Stage 1: Add one-tap Simple Friday meal templates in the Suggestions flow.

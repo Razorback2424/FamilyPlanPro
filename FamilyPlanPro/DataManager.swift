@@ -373,15 +373,11 @@ final class DataManager {
     }
 
     func reconcileGroceryCadence(for plan: WeeklyPlan) {
-        guard let list = plan.groceryList else {
+        guard let list = plan.groceryList, isGroceryCadenceEligible(for: plan, list: list) else {
             cancelGroceryCadence(for: plan)
             return
         }
-        if flags.notificationsGroceryCadence && flags.mealsGroceryList {
-            scheduleGroceryCadenceIfEligible(for: plan, list: list)
-        } else {
-            cancelGroceryCadence(for: plan)
-        }
+        scheduleGroceryCadenceIfEligible(for: plan, list: list)
     }
 
     private func ensureDefaultUsers(for family: Family) {
@@ -428,14 +424,18 @@ final class DataManager {
     }
 
     private func scheduleGroceryCadenceIfEligible(for plan: WeeklyPlan, list: GroceryList) {
-        guard flags.notificationsGroceryCadence else { return }
-        guard isCurrentWeek(plan) else { return }
-        guard !list.items.isEmpty else { return }
+        guard isGroceryCadenceEligible(for: plan, list: list) else { return }
         groceryCadenceScheduler?.scheduleNudges(weekStart: plan.startDate, weekId: plan.id.uuidString)
     }
 
+    private func isGroceryCadenceEligible(for plan: WeeklyPlan, list: GroceryList) -> Bool {
+        flags.notificationsGroceryCadence &&
+        flags.mealsGroceryList &&
+        isCurrentWeek(plan) &&
+        !list.items.isEmpty
+    }
+
     private func cancelGroceryCadence(for plan: WeeklyPlan) {
-        guard flags.notificationsGroceryCadence else { return }
         groceryCadenceScheduler?.cancelNudges(weekId: plan.id.uuidString)
     }
 
