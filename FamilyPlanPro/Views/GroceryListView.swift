@@ -8,6 +8,12 @@ struct GroceryListView: View {
     @Environment(\.notificationScheduler) private var notificationScheduler
     @Bindable var list: GroceryList
 
+    private var dataManager: DataManager {
+        DataManager(context: context,
+                    flags: featureFlags,
+                    groceryCadenceScheduler: GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler))
+    }
+
     private var groupedItems: [(Date?, [GroceryItem])] {
         let grouped = Dictionary(grouping: list.items) { item in
             item.dayRef.map { Calendar.current.startOfDay(for: $0) }
@@ -45,14 +51,10 @@ struct GroceryListView: View {
         }
         .navigationTitle("Grocery List")
         .onAppear {
-            maybeScheduleCadence()
+            reconcileCadence()
         }
         .onChange(of: list.items.count) { _, _ in
-            if list.items.isEmpty {
-                cancelCadenceIfNeeded()
-            } else {
-                maybeScheduleCadence()
-            }
+            reconcileCadence()
         }
         .onDisappear {
             try? context.save()
@@ -94,7 +96,6 @@ struct GroceryListView: View {
         list.items.append(item)
         context.insert(item)
         try? context.save()
-        maybeScheduleCadence()
     }
 
     private func deleteItems(at offsets: IndexSet, in items: [GroceryItem]) {
@@ -104,27 +105,11 @@ struct GroceryListView: View {
             context.delete(item)
         }
         try? context.save()
-        if list.items.isEmpty {
-            cancelCadenceIfNeeded()
-        }
     }
 
-    private func maybeScheduleCadence() {
-        guard featureFlags.notificationsGroceryCadence else { return }
+    private func reconcileCadence() {
         guard let plan = list.plan else { return }
-        let calendar = Calendar.current
-        let startOfWeek = calendar.startOfWeek(for: Date())
-        guard calendar.isDate(plan.startDate, equalTo: startOfWeek, toGranularity: .day) else { return }
-        guard !list.items.isEmpty else { return }
-        GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
-            .scheduleNudges(weekStart: plan.startDate, weekId: plan.id.uuidString)
-    }
-
-    private func cancelCadenceIfNeeded() {
-        guard featureFlags.notificationsGroceryCadence else { return }
-        guard let plan = list.plan else { return }
-        GroceryCadenceScheduler(scheduler: notificationScheduler.scheduler)
-            .cancelNudges(weekId: plan.id.uuidString)
+        dataManager.reconcileGroceryCadence(for: plan)
     }
 }
 

@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Route grocery-list screen cadence updates through DataManager so notification eligibility is decided in one place.
 - Stage 1: Make grocery cadence timing deterministic under test and cover the remaining-days-only Sun/Thu scheduling rules.
 - Stage 1: Cancel stale Sun/Thu grocery cadence notifications whenever a grocery list becomes ineligible for the current week.
 - Stage 1: Add grocery-list accessibility hooks and a UI smoke path for grouped sections plus manual item edits.
