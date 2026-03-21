@@ -123,8 +123,8 @@ final class DataManager {
                               author: User? = nil,
                               reasonForChange: String? = nil,
                               for slot: MealSlot) -> MealSuggestion {
-        deleteSuggestion(slot.pendingSuggestion)
-        deleteSuggestion(slot.finalizedSuggestion)
+        removePendingSuggestion(from: slot)
+        removeFinalizedSuggestion(from: slot)
         let suggestion = MealSuggestion(mealName: mealName,
                                         responsibleUserID: responsibleUser?.id,
                                         authorUserID: author?.id,
@@ -142,7 +142,7 @@ final class DataManager {
 
     func acceptPendingSuggestion(in slot: MealSlot) {
         if let pending = slot.pendingSuggestion {
-            deleteSuggestion(slot.finalizedSuggestion)
+            removeFinalizedSuggestion(from: slot)
             slot.finalizedSuggestion = pending
             slot.pendingSuggestion = nil
             if let family = slot.plan?.family {
@@ -162,8 +162,8 @@ final class DataManager {
         let previousModifierID = plan.lastModifiedByUserID
         let rejectingUserID = author?.id
 
-        deleteSuggestion(slot.pendingSuggestion)
-        deleteSuggestion(slot.finalizedSuggestion)
+        removePendingSuggestion(from: slot)
+        removeFinalizedSuggestion(from: slot)
 
         var shouldEnterConflict = false
         if let lastUserID = previousModifierID,
@@ -204,6 +204,8 @@ final class DataManager {
         let trimmedName = finalMealName.trimmingCharacters(in: .whitespacesAndNewlines)
         precondition(!trimmedName.isEmpty, "Final meal name must not be empty")
 
+        removePendingSuggestion(from: slot)
+        removeFinalizedSuggestion(from: slot)
         let suggestion = MealSuggestion(mealName: trimmedName,
                                         responsibleUserID: responsibleUser?.id,
                                         authorUserID: user?.id,
@@ -257,14 +259,26 @@ final class DataManager {
     }
 
     func deleteMealSlot(_ slot: MealSlot) {
-        deleteSuggestion(slot.pendingSuggestion)
-        deleteSuggestion(slot.finalizedSuggestion)
+        removePendingSuggestion(from: slot)
+        removeFinalizedSuggestion(from: slot)
         context.delete(slot)
     }
 
     private func deleteSuggestion(_ suggestion: MealSuggestion?) {
         guard let suggestion else { return }
         context.delete(suggestion)
+    }
+
+    private func removePendingSuggestion(from slot: MealSlot) {
+        let suggestion = slot.pendingSuggestion
+        slot.pendingSuggestion = nil
+        deleteSuggestion(suggestion)
+    }
+
+    private func removeFinalizedSuggestion(from slot: MealSlot) {
+        let suggestion = slot.finalizedSuggestion
+        slot.finalizedSuggestion = nil
+        deleteSuggestion(suggestion)
     }
 
     private func isCurrentWeek(_ plan: WeeklyPlan) -> Bool {
