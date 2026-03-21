@@ -104,6 +104,50 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testSaveAndSubmitBlockWhenResponsibleIsUnassigned() throws {
+        let mealName = "Tacos \(Int(Date().timeIntervalSince1970))"
+
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launch()
+
+        let mealField = app.textFields["Meal name"].firstMatch
+        XCTAssertTrue(mealField.waitForExistence(timeout: 2))
+        mealField.tap()
+        mealField.typeText(mealName)
+
+        let responsiblePicker = app.buttons["Partner A"].firstMatch
+        if responsiblePicker.waitForExistence(timeout: 2) {
+            responsiblePicker.tap()
+        } else {
+            let fallbackPicker = app.buttons["Responsible"].firstMatch
+            XCTAssertTrue(fallbackPicker.waitForExistence(timeout: 2))
+            fallbackPicker.tap()
+        }
+
+        let unassignedOption = app.buttons["Unassigned"].firstMatch
+        XCTAssertTrue(unassignedOption.waitForExistence(timeout: 2))
+        unassignedOption.tap()
+
+        let saveButton = app.buttons["Save Suggestion"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        let blockedAlert = app.alerts["Assign a Meal Owner"]
+        XCTAssertTrue(blockedAlert.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["This meal day has no owner. Choose a responsible person before saving or submitting."].waitForExistence(timeout: 2))
+        blockedAlert.buttons["OK"].tap()
+
+        XCTAssertFalse(app.staticTexts["Suggested: \(mealName)"].exists)
+
+        let submitButton = app.buttons["Submit for Review"]
+        XCTAssertTrue(submitButton.waitForExistence(timeout: 2))
+        submitButton.tap()
+
+        XCTAssertTrue(app.alerts["Assign a Meal Owner"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testOwnershipRulesFlagOffHidesOwnershipAndSimpleFridayAffordances() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"

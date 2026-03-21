@@ -31,6 +31,11 @@ struct GroceryListView: View {
         }
     }
 
+    private var availableDays: [Date] {
+        let slotDates = list.plan?.slots.map { Calendar.current.startOfDay(for: $0.date) } ?? []
+        return Array(Set(slotDates)).sorted()
+    }
+
     var body: some View {
         List {
             if list.items.isEmpty {
@@ -41,7 +46,7 @@ struct GroceryListView: View {
             ForEach(groupedItems, id: \.0) { (day, items) in
                 Section(header: sectionHeader(for: day)) {
                     ForEach(items) { item in
-                        GroceryItemRow(item: item)
+                        GroceryItemRow(item: item, availableDays: availableDays)
                     }
                     .onDelete { offsets in
                         deleteItems(at: offsets, in: items)
@@ -116,6 +121,14 @@ struct GroceryListView: View {
 private struct GroceryItemRow: View {
     @Environment(\.modelContext) private var context
     @Bindable var item: GroceryItem
+    let availableDays: [Date]
+
+    private var dayLabel: String {
+        guard let day = item.dayRef else {
+            return "Unscheduled"
+        }
+        return day.formatted(.dateTime.weekday(.abbreviated))
+    }
 
     var body: some View {
         HStack {
@@ -123,6 +136,17 @@ private struct GroceryItemRow: View {
                 .textInputAutocapitalization(.words)
                 .disableAutocorrection(true)
                 .accessibilityIdentifier(item.name.isEmpty ? "grocery-item-empty" : "grocery-item-name")
+            Menu(dayLabel) {
+                Button("Unscheduled") {
+                    updateDay(nil)
+                }
+                ForEach(availableDays, id: \.self) { day in
+                    Button(day.formatted(.dateTime.weekday(.wide))) {
+                        updateDay(day)
+                    }
+                }
+            }
+            .accessibilityIdentifier("grocery-item-day")
             Toggle("Checked", isOn: $item.checked)
                 .labelsHidden()
                 .accessibilityLabel("Checked")
@@ -133,6 +157,11 @@ private struct GroceryItemRow: View {
         .onChange(of: item.checked) { _, _ in
             try? context.save()
         }
+    }
+
+    private func updateDay(_ day: Date?) {
+        item.dayRef = day
+        try? context.save()
     }
 }
 

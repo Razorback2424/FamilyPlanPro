@@ -35,15 +35,6 @@ struct SuggestionView: View {
         plan.slots.sorted { $0.date < $1.date }
     }
 
-    private var hasSuggestionsForAllSlots: Bool {
-        let slots = sortedSlots
-        guard !slots.isEmpty else { return false }
-        return slots.allSatisfy {
-            let suggestion = $0.pendingSuggestion ?? $0.finalizedSuggestion
-            return !(suggestion?.mealName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        }
-    }
-
     init(plan: WeeklyPlan, currentUser: User?) {
         self._plan = Bindable(wrappedValue: plan)
         self.currentUser = currentUser
@@ -138,15 +129,11 @@ struct SuggestionView: View {
         .navigationTitle("Suggestions")
         .toolbar {
             Button("Save Suggestion") {
-                saveSuggestions(requireAllFilled: false)
+                _ = saveSuggestions(requireAllFilled: false)
             }
             Button("Submit for Review") {
                 guard let user = currentUser else { return }
-                guard hasSuggestionsForAllSlots else {
-                    activeAlert = .incompleteSubmission
-                    return
-                }
-                saveSuggestions(requireAllFilled: true)
+                guard saveSuggestions(requireAllFilled: true) else { return }
                 let manager = DataManager(context: context,
                                          flags: featureFlags,
                                          groceryCadenceScheduler: cadenceScheduler)
@@ -215,14 +202,24 @@ struct SuggestionView: View {
         }
     }
 
-    private func saveSuggestions(requireAllFilled: Bool) {
+    private func saveSuggestions(requireAllFilled: Bool) -> Bool {
         let trimmedInputs: [(MealSlot, String)] = sortedSlots.map { slot in
             (slot, (mealInputs[slot.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
+        if featureFlags.mealsOwnershipRules,
+           !members.isEmpty,
+           let blockedSlot = unassignedMealSlot(from: trimmedInputs) {
+            activeAlert = .unassignedMeal(
+                mealLabel: blockedSlot.mealType.displayName,
+                dayLabel: blockedSlot.date.formatted(.dateTime.weekday(.wide))
+            )
+            return false
+        }
+
         if requireAllFilled, !trimmedInputs.allSatisfy({ !$0.1.isEmpty }) {
             activeAlert = .incompleteSubmission
-            return
+            return false
         }
 
         let manager = DataManager(context: context,
@@ -254,6 +251,18 @@ struct SuggestionView: View {
 
         plan.lastModifiedByUserID = currentUser?.id
         try? context.save()
+        return true
+    }
+
+    private func unassignedMealSlot(from trimmedInputs: [(MealSlot, String)]) -> MealSlot? {
+        trimmedInputs.first { pair in
+            let (slot, trimmedName) = pair
+            return !trimmedName.isEmpty && responsibleSelection(for: slot) == .unassigned
+        }?.0
+    }
+
+    private func responsibleSelection(for slot: MealSlot) -> ResponsibleSelection {
+        responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot)
     }
 
     private func updateOwnershipRule(for day: DayOfWeek, selection: ResponsibleSelection) {
@@ -289,11 +298,33 @@ struct SuggestionView: View {
 
     private enum ActiveAlert: Identifiable {
         case incompleteSubmission
+        case unassignedMeal(mealLabel: String, dayLabel: String)
 
-        var id: String { "incompleteSubmission" }
-        var title: String { "Add Meal Suggestions" }
+        var id: String {
+            switch self {
+            case .incompleteSubmission:
+                return "incompleteSubmission"
+            case let .unassignedMeal(mealLabel, dayLabel):
+                return "unassignedMeal-\(dayLabel)-\(mealLabel)"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .incompleteSubmission:
+                return "Add Meal Suggestions"
+            case .unassignedMeal:
+                return "Assign a Meal Owner"
+            }
+        }
+
         var message: String {
-            "Please add a suggestion for every meal this week before submitting for review."
+            switch self {
+            case .incompleteSubmission:
+                return "Please add a suggestion for every meal this week before submitting for review."
+            case .unassignedMeal:
+                return "This meal day has no owner. Choose a responsible person before saving or submitting."
+            }
         }
     }
 }

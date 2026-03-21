@@ -1,6 +1,8 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Block saving or submitting a meal suggestion when ownership rules leave that day unassigned, with a targeted ownership alert and UI coverage.
+- Stage 1: Let manual grocery items be assigned to a specific day so grouped grocery sections stay useful after edits.
 - Stage 1: Add a launch smoke test that verifies Planner/Settings navigation from the top-level tabs.
 - Tests: Add shared Xcode schemes so `xcodebuild` can isolate unit tests from UI-test orchestration.
 - Tests: Add Stage 1 coverage for accepting a resolved meal conflict without leaving pending or orphaned suggestions.
