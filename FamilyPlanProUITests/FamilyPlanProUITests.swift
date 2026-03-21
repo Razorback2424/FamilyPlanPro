@@ -46,6 +46,32 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testFinalizedGroceryFlowSupportsGroupedListAndManualItemEdit() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
+
+        let groceryLink = app.buttons["Grocery List"]
+        XCTAssertTrue(groceryLink.waitForExistence(timeout: 2))
+        groceryLink.tap()
+
+        XCTAssertTrue(app.navigationBars["Grocery List"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.otherElements["grocery-section-1"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.otherElements["grocery-section-2"].waitForExistence(timeout: 2))
+
+        let addButton = app.buttons["Add Item"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 2))
+        addButton.tap()
+
+        let emptyItemField = app.textFields["grocery-item-empty"].firstMatch
+        XCTAssertTrue(emptyItemField.waitForExistence(timeout: 2))
+        emptyItemField.tap()
+        emptyItemField.typeText("Bananas")
+        XCTAssertEqual(emptyItemField.value as? String, "Bananas")
+    }
+
+    @MainActor
     func testFirstLaunchBootstrapsSuggestionPlanWithOwnersAndSimpleFriday() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"

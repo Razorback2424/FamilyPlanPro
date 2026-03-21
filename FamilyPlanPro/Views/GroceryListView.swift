@@ -77,6 +77,16 @@ struct GroceryListView: View {
                     .font(.subheadline)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(sectionAccessibilityIdentifier(for: day))
+    }
+
+    private func sectionAccessibilityIdentifier(for day: Date?) -> String {
+        guard let day else {
+            return "grocery-section-unscheduled"
+        }
+        let weekday = Calendar.current.component(.weekday, from: day)
+        return "grocery-section-\(weekday)"
     }
 
     private func addItem() {
@@ -127,6 +137,7 @@ private struct GroceryItemRow: View {
             TextField("Item", text: $item.name)
                 .textInputAutocapitalization(.words)
                 .disableAutocorrection(true)
+                .accessibilityIdentifier(item.name.isEmpty ? "grocery-item-empty" : "grocery-item-name")
             Toggle("Checked", isOn: $item.checked)
                 .labelsHidden()
                 .accessibilityLabel("Checked")

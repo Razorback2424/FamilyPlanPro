@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Add grocery-list accessibility hooks and a UI smoke path for grouped sections plus manual item edits.
 - Stage 1: Hide ownership-rule and Simple Friday UI affordances when meal ownership rules are turned off.
 - Stage 1: Add one-tap Simple Friday meal templates in the Suggestions flow.
 - Stage 1: Add day-by-day weekly meal ownership editing in the Suggestions flow, with rule changes reapplying to unsaved meals.
