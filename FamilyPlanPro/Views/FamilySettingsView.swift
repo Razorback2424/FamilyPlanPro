@@ -18,6 +18,10 @@ struct FamilySettingsView: View {
         trimmedFamilyName.isEmpty
     }
 
+    private var sortedMembers: [User] {
+        family.members.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     var body: some View {
         Form {
             Section("Family Details") {
@@ -29,7 +33,7 @@ struct FamilySettingsView: View {
                 if family.members.isEmpty {
                     ContentUnavailableView("No Members", systemImage: "person.3", description: Text("Add the people in your household so you can assign meal responsibilities."))
                 } else {
-                    ForEach(family.members) { member in
+                    ForEach(sortedMembers) { member in
                         Text(member.name)
                     }
                     .onDelete(perform: deleteMembers)
@@ -45,6 +49,21 @@ struct FamilySettingsView: View {
                         addMember()
                     }
                     .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
+            Section("Weekday Default Owners") {
+                if sortedMembers.isEmpty {
+                    Text("Add household members to set default meal owners for new weeks.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
+                        Picker(day.localizedName, selection: weekdayDefaultBinding(for: day)) {
+                            ForEach(sortedMembers) { member in
+                                Text(member.name).tag(member.id)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -78,9 +97,10 @@ struct FamilySettingsView: View {
     }
 
     private func deleteMembers(at offsets: IndexSet) {
+        let sortedMembers = sortedMembers
         for index in offsets {
-            guard family.members.indices.contains(index) else { continue }
-            let member = family.members[index]
+            guard sortedMembers.indices.contains(index) else { continue }
+            let member = sortedMembers[index]
             context.delete(member)
         }
 
@@ -93,6 +113,29 @@ struct FamilySettingsView: View {
 
     private func cancel() {
         dismiss()
+    }
+
+    private func weekdayDefaultBinding(for day: DayOfWeek) -> Binding<UUID> {
+        Binding(
+            get: { weekdayDefaultOwnerID(for: day) },
+            set: { updateWeekdayDefaultOwner($0, for: day) }
+        )
+    }
+
+    private func weekdayDefaultOwnerID(for day: DayOfWeek) -> UUID {
+        let manager = DataManager(context: context)
+        let rules = manager.familyOwnershipDefaults(for: family)
+        if let ownerID = rules[String(day.rawValue)],
+           let ownerUUID = UUID(uuidString: ownerID) {
+            return ownerUUID
+        }
+        return sortedMembers.first?.id ?? UUID()
+    }
+
+    private func updateWeekdayDefaultOwner(_ ownerID: UUID, for day: DayOfWeek) {
+        let manager = DataManager(context: context)
+        let owner = family.members.first { $0.id == ownerID }
+        manager.updateFamilyOwnershipDefault(for: day, owner: owner, in: family)
     }
 
     private func saveAndDismiss() {

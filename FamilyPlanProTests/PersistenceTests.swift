@@ -119,4 +119,35 @@ final class PersistenceTests: XCTestCase {
         XCTAssertEqual(fetchedFamilies.first?.members.count, 1)
         XCTAssertEqual(fetchedFamilies.first?.members.first?.name, "Bob")
     }
+
+    func testFamilyOwnershipDefaultsPersistAcrossReload() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+        ])
+
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("FamilyDefaults-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Store.sqlite")
+        let config = ModelConfiguration(schema: schema, url: url)
+
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let manager = DataManager(context: container.mainContext)
+        let family = manager.createFamily(name: "Original")
+        let alice = manager.addUser(name: "Alice", to: family)
+        let bob = manager.addUser(name: "Bob", to: family)
+
+        manager.updateFamilyOwnershipDefault(for: .monday, owner: bob, in: family)
+        manager.updateFamilyOwnershipDefault(for: .tuesday, owner: alice, in: family)
+        try manager.save()
+
+        let container2 = try ModelContainer(for: schema, configurations: [config])
+        let fetchedFamilies = try container2.mainContext.fetch(FetchDescriptor<Family>())
+
+        XCTAssertEqual(fetchedFamilies.count, 1)
+        let storedRules = fetchedFamilies.first?.defaultOwnershipRules ?? [:]
+        XCTAssertEqual(storedRules[String(DayOfWeek.monday.rawValue)], bob.id.uuidString)
+        XCTAssertEqual(storedRules[String(DayOfWeek.tuesday.rawValue)], alice.id.uuidString)
+    }
 }

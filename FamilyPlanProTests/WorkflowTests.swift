@@ -144,6 +144,56 @@ final class WorkflowTests: XCTestCase {
         XCTAssertEqual(mondaySlot.owner?.id, partnerB.id)
     }
 
+    func testCurrentWeekInheritsFamilyOwnershipDefaults() throws {
+        let container = try makeContainer()
+        let manager = DataManager(context: container.mainContext, flags: makeStage1Flags())
+        let family = manager.createFamily(name: "Test")
+        let partnerA = manager.addUser(name: "Partner A", to: family)
+        let partnerB = manager.addUser(name: "Partner B", to: family)
+
+        manager.updateFamilyOwnershipDefault(for: .monday, owner: partnerB, in: family)
+        manager.updateFamilyOwnershipDefault(for: .sunday, owner: partnerA, in: family)
+        manager.updateFamilyOwnershipDefault(for: .friday, owner: partnerB, in: family)
+
+        let plan = manager.getOrCreateCurrentWeekPlan(for: family)
+
+        XCTAssertEqual(plan.ownershipRulesSnap?.rules[String(DayOfWeek.monday.rawValue)], partnerB.id.uuidString)
+        XCTAssertEqual(plan.ownershipRulesSnap?.rules[String(DayOfWeek.sunday.rawValue)], partnerA.id.uuidString)
+
+        let mondaySlot = try XCTUnwrap(plan.slots.first(where: { $0.dayOfWeek == .monday }))
+        let sundaySlot = try XCTUnwrap(plan.slots.first(where: { $0.dayOfWeek == .sunday }))
+        let fridaySlot = try XCTUnwrap(plan.slots.first(where: { $0.dayOfWeek == .friday }))
+
+        XCTAssertEqual(mondaySlot.owner?.id, partnerB.id)
+        XCTAssertEqual(sundaySlot.owner?.id, partnerA.id)
+        XCTAssertEqual(fridaySlot.owner?.id, partnerB.id)
+        XCTAssertTrue(fridaySlot.isSimple)
+    }
+
+    func testUpdatingCurrentWeekOwnershipRuleDoesNotChangeFamilyDefaultsForNextWeek() throws {
+        let container = try makeContainer()
+        let manager = DataManager(context: container.mainContext, flags: makeStage1Flags())
+        let family = manager.createFamily(name: "Test")
+        let partnerA = manager.addUser(name: "Partner A", to: family)
+        let partnerB = manager.addUser(name: "Partner B", to: family)
+
+        manager.updateFamilyOwnershipDefault(for: .monday, owner: partnerA, in: family)
+
+        let currentWeek = manager.getOrCreateCurrentWeekPlan(for: family)
+        manager.updateOwnershipRule(for: .monday, owner: partnerB, in: currentWeek)
+
+        XCTAssertEqual(family.defaultOwnershipRules[String(DayOfWeek.monday.rawValue)], partnerA.id.uuidString)
+        XCTAssertEqual(currentWeek.ownershipRulesSnap?.rules[String(DayOfWeek.monday.rawValue)], partnerB.id.uuidString)
+
+        let nextWeekStart = Calendar.current.date(byAdding: .day, value: 7, to: Calendar.current.startOfWeek(for: currentWeek.startDate))!
+        let nextWeek = manager.createWeeklyPlan(startDate: nextWeekStart, for: family)
+        _ = manager.addMealSlot(dayOfWeek: .monday, mealType: .dinner, to: nextWeek)
+
+        let mondaySlot = try XCTUnwrap(nextWeek.slots.first(where: { $0.dayOfWeek == .monday }))
+        XCTAssertEqual(nextWeek.ownershipRulesSnap?.rules[String(DayOfWeek.monday.rawValue)], partnerA.id.uuidString)
+        XCTAssertEqual(mondaySlot.owner?.id, partnerA.id)
+    }
+
     func testCounterReviewKeepsReviewMode() throws {
         let container = try makeContainer()
         let manager = DataManager(context: container.mainContext)

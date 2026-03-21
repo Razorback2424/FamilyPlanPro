@@ -39,12 +39,14 @@ enum MealType: String, Codable, CaseIterable {
 final class Family {
     var id: UUID
     var name: String
+    var defaultOwnershipRulesJSON: String
     @Relationship(deleteRule: .cascade) var members: [User] = []
     @Relationship(deleteRule: .cascade) var weeklyPlans: [WeeklyPlan] = []
 
-    init(id: UUID = UUID(), name: String) {
+    init(id: UUID = UUID(), name: String, defaultOwnershipRules: [String: String] = [:]) {
         self.id = id
         self.name = name
+        self.defaultOwnershipRulesJSON = Family.encodeRules(defaultOwnershipRules)
     }
 
     var users: [User] {
@@ -55,6 +57,27 @@ final class Family {
     var plans: [WeeklyPlan] {
         get { weeklyPlans }
         set { weeklyPlans = newValue }
+    }
+
+    var defaultOwnershipRules: [String: String] {
+        get { Family.decodeRules(defaultOwnershipRulesJSON) }
+        set { defaultOwnershipRulesJSON = Family.encodeRules(newValue) }
+    }
+
+    private static func encodeRules(_ rules: [String: String]) -> String {
+        guard let data = try? JSONEncoder().encode(rules),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return json
+    }
+
+    private static func decodeRules(_ json: String) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return decoded
     }
 }
 

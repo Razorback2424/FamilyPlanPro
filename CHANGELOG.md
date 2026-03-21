@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Add household weekday meal-owner defaults in Family Settings so new weeks inherit the household's preferred ownership pattern.
 - Stage 1: Block saving or submitting a meal suggestion when ownership rules leave that day unassigned, with a targeted ownership alert and UI coverage.
 - Stage 1: Let manual grocery items be assigned to a specific day so grouped grocery sections stay useful after edits.
 - Stage 1: Add a launch smoke test that verifies Planner/Settings navigation from the top-level tabs.

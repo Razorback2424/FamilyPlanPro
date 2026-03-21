@@ -300,13 +300,47 @@ final class DataManager {
     }
 
     private func createOwnershipRulesSnap(for family: Family, plan: WeeklyPlan) -> OwnershipRulesSnap {
-        let rules = defaultOwnershipRules(for: family)
+        let rules = familyOwnershipDefaults(for: family)
         let snap = OwnershipRulesSnap(rules: rules, fridaySimple: true, family: family, plan: plan)
         context.insert(snap)
         return snap
     }
 
-    private func defaultOwnershipRules(for family: Family) -> [String: String] {
+    func familyOwnershipDefaults(for family: Family) -> [String: String] {
+        let storedRules = family.defaultOwnershipRules
+        guard !storedRules.isEmpty else {
+            return builtInOwnershipRotation(for: family)
+        }
+
+        let validUserIDs = Set(family.members.map(\.id))
+        let fallbackRules = builtInOwnershipRotation(for: family)
+        var resolvedRules: [String: String] = [:]
+
+        for day in DayOfWeek.allCases {
+            let key = String(day.rawValue)
+            if let storedID = storedRules[key],
+               let ownerUUID = UUID(uuidString: storedID),
+               validUserIDs.contains(ownerUUID) {
+                resolvedRules[key] = storedID
+            } else if let fallbackID = fallbackRules[key] {
+                resolvedRules[key] = fallbackID
+            }
+        }
+
+        return resolvedRules
+    }
+
+    func updateFamilyOwnershipDefault(for day: DayOfWeek, owner: User?, in family: Family) {
+        var rules = family.defaultOwnershipRules
+        if let owner {
+            rules[String(day.rawValue)] = owner.id.uuidString
+        } else {
+            rules.removeValue(forKey: String(day.rawValue))
+        }
+        family.defaultOwnershipRules = rules
+    }
+
+    private func builtInOwnershipRotation(for family: Family) -> [String: String] {
         let users = family.members
         guard !users.isEmpty else { return [:] }
         if users.count == 1, let only = users.first {
