@@ -105,11 +105,15 @@ struct SuggestionView: View {
                         Text("Responsible: \(responsibleName(for: suggestion.responsibleUserID))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else {
+                    } else if featureFlags.mealsOwnershipRules {
                         Text("Owner: \(slot.owner?.name ?? "Unassigned")")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("owner-title-\(slot.id.uuidString)")
+                    } else {
+                        Text("No saved suggestion yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
                     }
 
                     MealSlotEntryView(

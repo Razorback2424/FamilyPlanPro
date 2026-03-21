@@ -57,6 +57,41 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testSimpleFridayTemplateCanPrefillSuggestion() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launch()
+
+        let templateButton = app.buttons["Use Simple Friday Template"]
+        XCTAssertTrue(templateButton.waitForExistence(timeout: 2))
+        templateButton.tap()
+
+        let leftoversOption = app.buttons["Leftovers"]
+        XCTAssertTrue(leftoversOption.waitForExistence(timeout: 2))
+        leftoversOption.tap()
+
+        let saveButton = app.buttons["Save Suggestion"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 2))
+        saveButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Suggested: Leftovers"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testOwnershipRulesFlagOffHidesOwnershipAndSimpleFridayAffordances() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["FEATURE_FLAGS"] = "ff.meals.ownershipRules=false"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Suggestions"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["Simple Friday"].exists)
+        XCTAssertFalse(app.staticTexts["Default owner: Partner A"].exists)
+        XCTAssertFalse(app.buttons["Use Simple Friday Template"].exists)
+        XCTAssertFalse(app.staticTexts["Ownership Rules"].exists)
+    }
+
+    @MainActor
     func testSuggestionsPersistAndSubmitTransitionsToReview() throws {
         let mealName = "Tacos \(Int(Date().timeIntervalSince1970))"
 

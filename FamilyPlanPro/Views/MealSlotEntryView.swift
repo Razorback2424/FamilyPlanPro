@@ -3,6 +3,14 @@ import SwiftData
 import Observation
 
 struct MealSlotEntryView: View {
+    private static let simpleFridayTemplates = [
+        "Leftovers",
+        "Breakfast for Dinner",
+        "Takeout",
+        "Pasta"
+    ]
+
+    @Environment(\.featureFlags) private var featureFlags
     @Bindable var slot: MealSlot
     var members: [User]
     @Binding var mealName: String
@@ -29,12 +37,12 @@ struct MealSlotEntryView: View {
                 Text(slot.date, format: .dateTime.month().day())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let owner = slot.owner {
+                if featureFlags.mealsOwnershipRules, let owner = slot.owner {
                     Text("Default owner: \(owner.name)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                if slot.isSimple {
+                if featureFlags.mealsOwnershipRules, slot.isSimple {
                     Text("Simple Friday")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -43,6 +51,17 @@ struct MealSlotEntryView: View {
 
             TextField("Meal name", text: $mealName)
                 .textFieldStyle(.roundedBorder)
+
+            if featureFlags.mealsOwnershipRules, slot.isSimple {
+                Menu("Use Simple Friday Template") {
+                    ForEach(Self.simpleFridayTemplates, id: \.self) { template in
+                        Button(template) {
+                            mealName = template
+                        }
+                    }
+                }
+                .accessibilityIdentifier("simple-friday-template-\(slot.id.uuidString)")
+            }
 
             Picker("Responsible", selection: $responsibleSelection) {
                 Text("Unassigned").tag(ResponsibleSelection.unassigned)

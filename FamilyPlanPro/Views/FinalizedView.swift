@@ -82,7 +82,7 @@ struct FinalizedView: View {
                     Text("Responsible: \(slot.owner?.name ?? "Unassigned")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if slot.isSimple {
+                    if featureFlags.mealsOwnershipRules, slot.isSimple {
                         Text("Simple Friday")
                             .font(.caption)
                             .foregroundStyle(.secondary)
