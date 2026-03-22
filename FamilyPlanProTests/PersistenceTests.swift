@@ -150,4 +150,24 @@ final class PersistenceTests: XCTestCase {
         XCTAssertEqual(storedRules[String(DayOfWeek.monday.rawValue)], bob.id.uuidString)
         XCTAssertEqual(storedRules[String(DayOfWeek.tuesday.rawValue)], alice.id.uuidString)
     }
+
+    func testFamilyOwnershipDefaultsFallbackWhenLegacyJSONIsMissing() throws {
+        let schema = Schema([
+            Family.self,
+            User.self,
+        ])
+
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = container.mainContext
+        let family = Family(name: "Legacy")
+        family.defaultOwnershipRulesJSON = nil
+        context.insert(family)
+
+        try context.save()
+
+        let fetchedFamilies = try context.fetch(FetchDescriptor<Family>())
+        XCTAssertEqual(fetchedFamilies.count, 1)
+        XCTAssertEqual(fetchedFamilies.first?.defaultOwnershipRules, [:])
+    }
 }

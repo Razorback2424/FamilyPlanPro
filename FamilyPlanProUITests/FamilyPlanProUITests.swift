@@ -61,6 +61,38 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testCurrentWeekDefaultsMoveToSettings() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "suggestionMode"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Suggestions"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.staticTexts["Ownership Rules"].exists)
+
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["This Week Meal Defaults"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Edit household defaults"].exists)
+    }
+
+    @MainActor
+    func testThisWeekOverviewOpensFromFinalizedPlanner() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
+
+        let thisWeekEntry = app.buttons["this-week-entry"]
+        XCTAssertTrue(thisWeekEntry.waitForExistence(timeout: 2))
+        thisWeekEntry.tap()
+
+        XCTAssertTrue(app.navigationBars["This Week"].waitForExistence(timeout: 2))
+        let finalizedMeal = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "finalized-meal-")).firstMatch
+        XCTAssertTrue(finalizedMeal.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testFinalizedGroceryFlowOpensGroupedSectionsAndAllowsItemEdit() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"

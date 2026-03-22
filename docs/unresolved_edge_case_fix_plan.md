@@ -1,236 +1,148 @@
 # Unresolved Edge Case Fix Plan
 
-Status: Updated on 2026-03-21 after re-grounding on Aristotle's current model/spec drift evidence: the active batch is now doc/model source-of-truth alignment, with the smallest safe slice narrowed to a doc-only Stage 1 data-model spec reset rather than persisted model changes.
+Status: Updated on 2026-03-22 for the likely smallest safe planner-density reduction slice. Planning remains read-only and async only.
 
 ## Current Decision
 
 Next action:
-- Treat the Grocery List smoke-path batch as complete.
-- Treat the Grocery List deletion-undo batch as complete.
-- Treat the harness-consistency batch as functionally resolved.
-- Defer any remaining contract-clarity debt from that batch.
-- Redirect the active slot to model/spec source-of-truth drift between `FamilyPlanPro/Models.swift` and `docs/tech/DATA_MODEL.md`.
-- Keep the smallest safe action doc-only unless Aristotle's evidence shows an immediate Stage 1 behavior bug that cannot be contained that way.
-- Hold queued UI and notification issues behind this source-of-truth batch.
+- Keep Grocery List smoke-path, deletion-undo, harness-consistency, cadence-copy, and the first read-only `This Week` overview batches closed.
+- Treat the active issue as a narrow planner-density reduction pass in `SuggestionView`.
+- Prefer removing the day-by-day ownership-rule editing UI from `SuggestionView` while preserving current ownership behavior.
+- Hold migration compatibility, broader MVP generalization, and source-of-truth work behind this UI-density batch.
 
 Current routing:
-- Manual add/edit visibility risk is treated as fixed on the product side.
-- The Grocery List smoke-path blocker is treated as closed after verification.
-- Grocery List deletion undo is treated as fixed on the product side and directly proven by Mendel's UI verification slice.
-- The harness-consistency issue is closed at functional scope.
-- Residual contract-clarity debt from the harness batch is deferred.
-- Aristotle's current evidence splits the model/spec drift into:
-  - true functional risks
-  - documentation-only drift
-- The true functional risks are:
-  - family ownership not enforced as `DATA_MODEL.md` specifies
-  - `WeeklyPlan` identity relies on `startDate` rather than an explicit unique `(familyId, year, isoWeek)` shape
-  - `MealSuggestion` cardinality/lifecycle differs from the spec's 1-N description
-- Documentation-only drift includes:
-  - spec-only common fields and timestamps
-  - future-stage entities and invariants not present in Stage 1 code
-- The active issue is now the doc/model source-of-truth mismatch itself, with doc-only narrowing as the leading candidate.
+- The `This Week` slice is treated as landed and no longer active here.
+- The active issue is planner density inside `SuggestionView`.
+- The smallest safe route is to remove the day-by-day defaults editor from the Suggestions screen, not to redesign ownership rules.
+- Do not widen this into ownership-rules behavior changes, family-default redesign, or generic action work.
 
 Verification gate:
-- Grocery List verification has cleared for the prior smoke-path batch.
-- Aristotle's fresh log acknowledges the product-side fix.
-- Boole reports build green and nearby Grocery List smoke coverage green.
-- Mendel reports direct UI verification passed for delete -> undo -> restored item.
-- The adjacent workflow test `testReopenFromFinalizedReturnsToSuggestions` also passed.
-- No further Grocery List verification follow-up is required unless Aristotle re-opens the batch.
-- Boole and Aristotle together now support closing the harness-consistency batch at functional scope.
-- Any remaining remainder is treated as contract-clarity debt, not an active functional blocker.
-- The new active slice should stay source-of-truth-first and avoid persisted model changes unless a concrete Stage 1 runtime bug requires them.
+- The minimum likely verification for this density-reduction batch is:
+  - `build`
+  - one narrow Suggestions UI smoke check if the repo already covers the surrounding screen behavior
+- If no targeted UI proof is available, keep verification to build plus focused review that ownership inheritance and per-meal assignment still work.
 
 Coordination rule:
-- Keep this file focused on issue selection, status, and safe sequencing.
+- Keep this file focused on issue selection, active status, acceptance boundaries, and exact deferrals.
+- Do not block the worker lane while formalizing decisions already converged by review + implementation-prep + verification lanes.
 
 ## Lane Status
 
 Active now:
-- `docs/tech/DATA_MODEL.md`
-  - Narrow Stage 1 doc-only narrowing candidate to match the actual persisted model surface.
+- `FamilyPlanPro/Views/SuggestionView.swift`
+  - likely one-file-first density reduction target
 
 Pending verification:
-- None until the plan decision is executed.
+- `build`
+- optional narrow Suggestions UI smoke or existing ownership-path check if already present
 
-Queued next candidates from Aristotle's current log:
+Queued next candidates:
 - `FamilyPlanProUITests/FamilyPlanProUITests.swift`
-  - UI tests still depend on older user-facing copy in places.
-- `FamilyPlanPro/Views/FinalizedView.swift`
-  - Finalized cadence copy alignment should be reconsidered only if Aristotle keeps it active after this source-of-truth pass.
+  - UI-test copy brittleness cleanup
+- `FamilyPlanPro/Models.swift`
+  - `Family.defaultOwnershipRulesJSON` migration compatibility
+- `docs/tech/DATA_MODEL.md`
+  - doc/model source-of-truth narrowing
 - `FamilyPlanPro/FamilyPlanProApp.swift`, `FamilyPlanPro/Notifications/GroceryCadenceScheduler.swift`
-  - Notification authorization behavior differs across debug-route and `UITEST_STATUS` harnesses.
-- `FamilyPlanPro/DataManager.swift`, `FamilyPlanPro/Views/WeeklyPlannerContainerView.swift`
-  - Multi-family source-of-truth behavior is underspecified for Stage 1.
-- `FamilyPlanPro/Models.swift`, `docs/tech/DATA_MODEL.md`
-  - Data-model docs and persisted model shapes diverge materially.
+  - remaining harness contract-clarity cleanup
 
 Queue rule:
-- Promote only one next-step issue at a time.
-- Prefer the smallest active-stage user-facing or verification gap before doc/harness cleanup.
+- Keep exactly one active implementation batch.
+- Do not promote `PlanItem`, `WeeklyCheckIn`, quick add/edit/status, or the generic action system while this compatibility batch is active.
+
+## Active Batch
+
+### Plan H: SuggestionView Density Reduction
+
+Goal:
+- Reduce visual and interaction density in `SuggestionView` without breaking ownership behavior.
+
+Preferred file ownership:
+- Worker lane only:
+  - `FamilyPlanPro/Views/SuggestionView.swift`
+- Optional test file only if the repo already has a narrow surrounding Suggestions UI check:
+  - `FamilyPlanProUITests/FamilyPlanProUITests.swift`
+
+Smallest safe implementation target:
+- Remove the `Ownership Rules` section from `SuggestionView`.
+- Keep all existing slot-level ownership reads and per-meal responsible selection intact.
+- Leave editing of family weekday defaults in `FamilySettingsView` only.
+- Avoid touching `DataManager` or ownership snapshot generation in this slice.
+
+Acceptance boundaries for this slice:
+1. `SuggestionView` no longer shows the day-by-day defaults editor.
+2. Existing slot ownership still comes from the already-resolved plan/slot state (`slot.owner`, saved suggestion responsible user, or explicit per-meal selection).
+3. Users can still change the responsible person for an individual meal suggestion from the existing per-slot entry controls.
+4. Family weekday defaults remain editable only in `FamilySettingsView`.
+5. No ownership snapshot regeneration or default-propagation logic changes are introduced.
+
+Likely fix shape:
+- Delete the `Ownership Rules` section and its explanatory copy from `SuggestionView`.
+- Keep the existing `responsibleSelections` and `defaultResponsibleSelection(for:)` flow intact so slot-level owner fallback still works.
+- Keep `saveSuggestions` and unassigned-owner validation untouched.
+- Do not remove ownership defaults from the product; only remove the day-by-day editor from the Suggestions surface.
+
+Safest removal assessment:
+- The safest way to remove day-by-day defaults from `SuggestionView` is UI-only:
+  - remove the section rendering and its local picker bindings
+  - do not change `updateOwnershipRule(for:)` usage anywhere else unless it becomes dead code as a direct result
+  - preserve `slot.owner` fallback and saved responsible-user logic exactly as-is
+- Why this is safest:
+  - ownership behavior is currently carried by `plan.ownershipRulesSnap`, `slot.owner`, and per-meal responsible selections
+  - the risky part is editing defaults in the weekly Suggestions screen, not reading/applying already-resolved owners
+  - leaving `FamilySettingsView` as the single editor avoids behavior drift while reducing Suggestions density
+
+Explicitly out of scope for this slice:
+- `DataManager` rule-generation changes
+- `OwnershipRulesSnap` redesign
+- `FamilySettingsView` redesign
+- family default ownership behavior changes
+- migration compatibility for `defaultOwnershipRulesJSON`
+- doc/model source-of-truth narrowing
+- `PlanItem`
+- `WeeklyCheckIn`
+- quick add/edit/status
+- generic action system
 
 ## Status
 
-Implemented so far:
-- `FamilyPlanProUITests/FamilyPlanProUITests.swift`
-  - Replaced brittle hard-coded grocery section identifiers with a grouped-section check based on visible weekday headers.
-  - Hardened the manual add/edit path by:
-    - recording grocery text-field count before add
-    - polling for a new field after `Add Item`
-    - interacting with the newest field
-    - dismissing the keyboard after typing
-    - asserting the typed value
-- `FamilyPlanPro/Views/GroceryListView.swift`
-  - Added a brief orientation section at the top of the screen.
-  - Added a simple completion summary.
-  - Replaced the empty-state placeholder text with a clearer `ContentUnavailableView`.
-- `CHANGELOG.md`
-  - Added a narrow Stage 1 entry for Grocery List empty-state guidance and manual item smoke-path hardening.
+Implemented so far in earlier batches:
+- Grocery List smoke-path hardening
+- Grocery delete/undo proof
+- harness-consistency functional fix
+- finalized cadence copy alignment
 
-Still unresolved:
-- The Grocery List deletion-undo batch is closed unless Aristotle reports a new regression.
-- The harness-consistency batch is closed at functional scope.
-- Residual contract-clarity debt from the harness batch is deferred.
-- The active unresolved lead issue is model/spec source-of-truth drift between `Models.swift` and `DATA_MODEL.md`.
-- Within that batch, the smallest safe active slice is doc-only narrowing unless a runtime Stage 1 bug must be fixed in code.
-- UI-test copy brittleness remains queued, not active.
+Current batch state:
+- Planning only
+- Likely one-file-first UI-density fix
+- No evidence yet that broader ownership-behavior changes are required
 
-Recorded verification result for the completed batch:
-- Build passed.
-- The targeted Grocery List smoke-path verification is treated as complete/cleared by Boole.
-- Direct UI verification passed for delete -> undo -> restored item.
-- Adjacent reopen-flow verification passed via `testReopenFromFinalizedReturnsToSuggestions`.
-- Aristotle’s current log still contains historical Grocery List entries, but this plan now treats that batch as closed unless Aristotle re-opens it with a new concrete failure.
-- Aristotle’s reconciled log now marks the prior Grocery List entries as fixed/regression-watch items, not active lead candidates.
-
-Implementation status for the active batch:
-- No code or doc change has been routed yet for the model/spec drift batch.
-- Current batch state:
-  - Planning only.
-  - The primary decision is whether to narrow the spec to the actual Stage 1 model surface or to change persisted models.
-
-Next issue selection:
-- Keep exactly one active issue.
-- Choose the smallest safe slice within the model/spec drift batch first.
-- Do not promote any queued UI, notification, or cadence issue while the source-of-truth batch is active.
-- Prefer doc-only narrowing over model changes unless a concrete runtime bug cannot be safely deferred.
-
-Active planning stance:
-- File target first: `docs/tech/DATA_MODEL.md`
-- Optional supporting note only if needed later: `README.md` or adjacent docs, not app code
-- User value target: restore one truthful source of truth for the Stage 1 data model so future work is planned against reality
-- Current status: planning only
-
-## Candidate Issues
-
-- High: `DATA_MODEL.md` overstates current Stage 1 persisted guarantees compared with `Models.swift`.
-- Medium: Family ownership constraints are not enforced as the spec currently claims.
-- Medium: `WeeklyPlan` identity in code does not match the spec's unique `(familyId, year, isoWeek)` shape.
-- Medium: `MealSuggestion` cardinality/lifecycle in code does not match the spec's 1-N description.
-- Medium: UI tests are overly coupled to user-facing copy.
-- Medium: Notification authorization behavior may still differ across test harness entry points.
-- Medium: Current-week bootstrap still treats the first fetched family as the effective app-wide default family.
-- Medium: Persisted model shapes still diverge materially from `docs/tech/DATA_MODEL.md`.
-- Low: Grocery flag-off behavior needs a clean recheck after the grocery smoke path is stable.
-- Low: Architecture docs do not fully match the current implementation.
-
-## Validated Now
-
-- Resolve now:
-  - Grocery UI smoke brittleness around add/edit. Completed.
-  - Manual grocery item visibility/focus only if the UI-test-only hardening does not fully resolve the issue. Completed.
-  - UI-test copy brittleness, but only as part of the same narrow grocery test pass. Completed as part of the batch.
-- Verify now:
-  - Treat the Grocery List deletion-undo batch as closed unless Aristotle reports a regression.
-- Resolve now:
-  - Decide and execute the smallest safe source-of-truth action for `DATA_MODEL.md` versus `Models.swift`.
-- Defer for now:
-  - Residual harness contract-clarity cleanup.
-  - Notification side-effect unification across all test entry points.
-  - Current-family / multi-family source-of-truth clarification.
-  - Grocery flag-off re-verification.
-  - Architecture doc reconciliation.
-
-Rationale:
-- The top Stage 1 Grocery List blocker has already been cleared.
-- The deletion-undo issue is now directly proven and does not justify more immediate work.
-- The harness-consistency issue is functionally closed and no longer deserves the active slot.
-- Aristotle's latest evidence distinguishes between true functional risks and documentation-only drift inside the model/spec mismatch.
-- The smallest safe next move is still doc-only narrowing because:
-  - the spec currently overclaims fields, invariants, and future-stage entities beyond the actual Stage 1 model
-  - changing persisted models to match the spec would create schema, migration, and behavior risk far beyond one slice
-  - the identified functional risks are real, but they are broader than a single safe model migration slice and are better captured explicitly as deferred runtime risks unless one is chosen as its own later active bug-fix slice
-- So the right immediate slice is to narrow `DATA_MODEL.md` to the real Stage 1 persisted model surface and explicitly call out deferred invariants rather than silently implying they already exist.
+Current execution stance:
+- Favor a one-file `SuggestionView` reduction before any ownership-behavior redesign.
+- Treat this as a narrow product-surface simplification, not an ownership-rules rewrite.
 
 ## Deferred
 
-- Runtime model-alignment changes for family ownership enforcement.
-  - Defer because this is a real behavior/invariant gap, but it is not the smallest safe slice compared with spec narrowing.
-- Runtime model-alignment changes for `WeeklyPlan` identity uniqueness.
-  - Defer because adding `(familyId, year, isoWeek)` identity is a schema/behavior migration, not a safe doc-lane slice.
-- Runtime model-alignment changes for `MealSuggestion` cardinality/lifecycle.
-  - Defer because this likely touches workflow behavior, relationships, and persistence semantics beyond one safe planning-only slice.
-- Residual harness contract-clarity debt.
-  - Defer because the functional batch is closed and the remainder is no longer an active behavior mismatch.
-- Notification side-effect isolation across every test harness.
-  - Defer because it likely spans `FamilyPlanProApp`, notification scheduler code, and test harness behavior.
-- Grocery-related flag-off re-verification.
-  - Defer until the primary grocery UI smoke path is stable.
-- Architecture doc cleanup beyond the Stage 1 data-model narrowing.
-  - Defer because the active source-of-truth slice should stay limited to `DATA_MODEL.md`.
+- `PlanItem` model introduction
+  - Defer because it is unrelated to this density-reduction slice.
+- `WeeklyCheckIn` model introduction
+  - Defer because it is unrelated to this density-reduction slice.
+- quick add/edit/status for arbitrary weekly items
+  - Defer because it is unrelated to this density-reduction slice.
+- generic action system
+  - Defer because it is unrelated to this density-reduction slice.
+- ownership-rules product redesign
+  - Defer because the active need is to simplify Suggestions, not redesign defaults.
+- migration compatibility for `defaultOwnershipRulesJSON`
+  - Defer because it is a separate compatibility batch and should not be combined with this UI simplification.
 
-### Plan E: Stage 1 data-model spec narrowing
+## Rationale
 
-Goal:
-- Narrow `docs/tech/DATA_MODEL.md` so it truthfully describes the Stage 1 persisted model surface that actually exists in `FamilyPlanPro/Models.swift`, while explicitly tagging deferred invariants and future-stage aspirations.
-
-Preferred file ownership:
-- Worker 1 only: `docs/tech/DATA_MODEL.md`
-
-Smallest safe implementation target:
-- Keep the slice doc-only and one-file-first.
-- Do not mutate persisted models, relationships, or schema in this batch.
-
-Acceptance boundaries for this slice:
-1. `DATA_MODEL.md` no longer claims Stage 1 persisted fields/invariants that the code clearly does not implement.
-2. Stage 1 entities in the doc map cleanly to the actual `@Model` types and their persisted fields/relationships.
-3. Spec-only future-stage fields and entities are either removed from the canonical Stage 1 description or explicitly marked as future/deferred.
-4. The doc explicitly calls out the known deferred runtime risks instead of implying they are already enforced.
-
-Explicitly out of scope for this slice:
-- Changes to `Models.swift`
-- SwiftData schema or migration work
-- DataManager workflow changes
-- Family ownership enforcement
-- `WeeklyPlan` identity redesign
-- `MealSuggestion` lifecycle/cardinality changes
-- Broader architecture/doc cleanup outside `DATA_MODEL.md`
-
-Doc-only versus model-change assessment:
-- Doc-only narrowing is the right next move.
-- Reason:
-  - the currently observed mismatch is larger than one safe runtime migration slice
-  - the spec currently functions as a false source of truth for multiple areas at once
-  - narrowing the spec restores truthful planning ground immediately without risking persisted data
-- Model changes should be split into later runtime slices only if individually promoted, for example:
-  - family ownership enforcement
-  - `WeeklyPlan` uniqueness/identity
-  - `MealSuggestion` relationship/lifecycle cleanup
-
-Immediate reconciliation paths once Aristotle reviews:
-- If Aristotle says `closed`:
-  - mark the doc/spec drift batch closed at documentation scope
-  - record that `DATA_MODEL.md` now matches the actual Stage 1 model surface closely enough to be the truthful planning reference
-  - promote UI-test copy brittleness as the next smallest safe follow-up
-- If Aristotle says `partially fixed`:
-  - keep the doc/spec drift batch active
-  - record whether the remaining issue is:
-    - a remaining Stage 1 doc overclaim
-    - a still-unclear deferred-runtime-risk note
-    - an area where the doc still mixes Stage 1 reality with future-stage aspirations
-  - narrow the next action to one smallest remaining doc/source-of-truth adjustment only
-  - do not promote queued issues yet
+- The density problem is local to `SuggestionView`, not to the ownership model itself.
+- The smallest safe response is to remove the weekly defaults editor from Suggestions while preserving slot-level ownership behavior.
+- The cleanest source-of-truth pattern is:
+  - family weekday defaults are edited in `FamilySettingsView`
+  - Suggestions consumes already-resolved ownership state and per-meal overrides only
 
 ## Implementation Plan
 

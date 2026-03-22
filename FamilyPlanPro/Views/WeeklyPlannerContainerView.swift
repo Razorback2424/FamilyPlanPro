@@ -26,21 +26,7 @@ struct WeeklyPlannerContainerView: View {
             if families.isEmpty {
                 AddFamilyView()
             } else if let plan = currentPlan {
-                let currentUser = plan.family?.members.first
-                if debugLaunchRoute == .groceryList, let list = plan.groceryList {
-                    GroceryListView(list: list)
-                } else {
-                    switch plan.status {
-                    case .suggestionMode:
-                        SuggestionView(plan: plan, currentUser: currentUser)
-                    case .reviewMode:
-                        ReviewView(plan: plan)
-                    case .conflict:
-                        ConflictView(plan: plan)
-                    case .finalized:
-                        FinalizedView(plan: plan)
-                    }
-                }
+                currentPlanContent(plan)
             } else {
                 VStack(spacing: 16) {
                     Spacer()
@@ -68,6 +54,16 @@ struct WeeklyPlannerContainerView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingAddFamily = true }) {
                     Label("New Family", systemImage: "plus")
+                }
+            }
+            if let plan = currentPlan, debugLaunchRoute != .groceryList {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        ThisWeekView(plan: plan)
+                    } label: {
+                        Label("This Week", systemImage: "calendar")
+                    }
+                    .accessibilityIdentifier("this-week-entry")
                 }
             }
 #if DEBUG
@@ -125,6 +121,25 @@ struct WeeklyPlannerContainerView: View {
             }
         }
 #endif
+    }
+
+    @ViewBuilder
+    private func currentPlanContent(_ plan: WeeklyPlan) -> some View {
+        let currentUser = plan.family?.members.first
+        if debugLaunchRoute == .groceryList, let list = plan.groceryList {
+            GroceryListView(list: list)
+        } else {
+            switch plan.status {
+            case .suggestionMode:
+                SuggestionView(plan: plan, currentUser: currentUser)
+            case .reviewMode:
+                ReviewView(plan: plan)
+            case .conflict:
+                ConflictView(plan: plan)
+            case .finalized:
+                FinalizedView(plan: plan)
+            }
+        }
     }
 
     private func createWeekIfNeeded() {

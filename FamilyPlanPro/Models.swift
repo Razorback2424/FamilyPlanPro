@@ -39,7 +39,7 @@ enum MealType: String, Codable, CaseIterable {
 final class Family {
     var id: UUID
     var name: String
-    var defaultOwnershipRulesJSON: String
+    var defaultOwnershipRulesJSON: String?
     @Relationship(deleteRule: .cascade) var members: [User] = []
     @Relationship(deleteRule: .cascade) var weeklyPlans: [WeeklyPlan] = []
 
@@ -72,8 +72,9 @@ final class Family {
         return json
     }
 
-    private static func decodeRules(_ json: String) -> [String: String] {
-        guard let data = json.data(using: .utf8),
+    private static func decodeRules(_ json: String?) -> [String: String] {
+        guard let json,
+              let data = json.data(using: .utf8),
               let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
             return [:]
         }

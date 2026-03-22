@@ -118,17 +118,23 @@ struct FamilyPlanProApp: App {
         do {
             return try makeContainer()
         } catch {
-            if fileManager.fileExists(atPath: storeURL.path) {
+            let nsError = error as NSError
+            let shouldResetStore = Self.shouldResetStoreAfterOpenFailure(environment: ProcessInfo.processInfo.environment)
+            let isMigrationFailure = Self.isMigrationFailure(nsError)
+
+            if shouldResetStore, !isMigrationFailure, fileManager.fileExists(atPath: storeURL.path) {
                 try? fileManager.removeItem(at: storeURL)
                 try? fileManager.removeItem(at: URL(fileURLWithPath: storeURL.path + "-shm"))
                 try? fileManager.removeItem(at: URL(fileURLWithPath: storeURL.path + "-wal"))
+
+                do {
+                    return try makeContainer()
+                } catch {
+                    fatalError("Could not create ModelContainer even after explicit store reset: \(error)")
+                }
             }
 
-            do {
-                return try makeContainer()
-            } catch {
-                fatalError("Could not create ModelContainer even after resetting the store: \(error)")
-            }
+            fatalError("Could not create ModelContainer without destroying the existing store: \(error)")
         }
     }()
 
@@ -185,6 +191,27 @@ struct FamilyPlanProApp: App {
 
         return nil
     }
+
+    private static func shouldResetStoreAfterOpenFailure(environment: [String: String]) -> Bool {
+        environment["RESET_STORE_ON_OPEN_FAILURE"] == "1"
+    }
+
+    private static func isMigrationFailure(_ error: NSError) -> Bool {
+        if error.domain == NSCocoaErrorDomain,
+           migrationFailureCodes.contains(error.code) {
+            return true
+        }
+
+        if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return isMigrationFailure(underlyingError)
+        }
+
+        return false
+    }
+
+    private static let migrationFailureCodes: Set<Int> = [
+        134100, 134110, 134111, 134130, 134140, 134170, 134190
+    ]
 
     private func applyFeatureFlagOverride(_ override: String) {
         let pairs = override.split(separator: ",")

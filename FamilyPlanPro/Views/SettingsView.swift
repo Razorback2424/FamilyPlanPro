@@ -9,6 +9,7 @@ struct SettingsView: View {
 
     @State private var budgetTarget: String = ""
     @State private var observedSpend: String = ""
+    @State private var showingFamilySettings = false
 
     private var family: Family? {
         families.first
@@ -32,6 +33,10 @@ struct SettingsView: View {
 
     private var canEditObservedSpend: Bool {
         currentPlan?.groceryList != nil
+    }
+
+    private var sortedMembers: [User] {
+        family?.members.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending } ?? []
     }
 
     private var budgetStatusColor: Color {
@@ -72,6 +77,45 @@ struct SettingsView: View {
 
                 Button("Save household names") {
                     try? context.save()
+                }
+
+                if family != nil {
+                    Button("Edit household defaults") {
+                        showingFamilySettings = true
+                    }
+                    Text("Household defaults apply to future weeks.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if featureFlags.mealsOwnershipRules, let plan = currentPlan {
+                Section("This Week Meal Defaults") {
+                    if sortedMembers.isEmpty {
+                        Text("Add household members before assigning default owners for this week.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
+                            Picker(day.localizedName, selection: currentWeekOwnershipBinding(for: day, in: plan)) {
+                                Text("Unassigned").tag(ResponsibleSelection.unassigned)
+                                ForEach(sortedMembers) { member in
+                                    Text(member.name).tag(ResponsibleSelection.user(member.id))
+                                }
+                            }
+                            .accessibilityIdentifier("settings-ownership-rule-\(day.rawValue)")
+                        }
+                    }
+                    Text("These defaults apply only to meals without a saved assignment in the current week.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Household defaults for future weeks live in Family Settings.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-household-defaults-hint")
+                    Text("Open Planner to update individual meals.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("settings-weekly-ownership-hint")
                 }
             }
 
@@ -115,6 +159,13 @@ struct SettingsView: View {
         .onChange(of: currentPlan?.groceryList?.id) { _, _ in
             syncBudgetFields()
         }
+        .sheet(isPresented: $showingFamilySettings) {
+            if let family {
+                NavigationStack {
+                    FamilySettingsView(family: family)
+                }
+            }
+        }
     }
 
     private func syncBudgetFields() {
@@ -129,6 +180,28 @@ struct SettingsView: View {
         } else {
             observedSpend = ""
         }
+    }
+
+    private func currentWeekOwnershipBinding(for day: DayOfWeek, in plan: WeeklyPlan) -> Binding<ResponsibleSelection> {
+        Binding(
+            get: { currentWeekOwnershipSelection(for: day, in: plan) },
+            set: { updateCurrentWeekOwnershipRule(for: day, selection: $0, in: plan) }
+        )
+    }
+
+    private func currentWeekOwnershipSelection(for day: DayOfWeek, in plan: WeeklyPlan) -> ResponsibleSelection {
+        guard let ruleID = plan.ownershipRulesSnap?.rules[String(day.rawValue)],
+              let ownerUUID = UUID(uuidString: ruleID) else {
+            return .unassigned
+        }
+        return .user(ownerUUID)
+    }
+
+    private func updateCurrentWeekOwnershipRule(for day: DayOfWeek, selection: ResponsibleSelection, in plan: WeeklyPlan) {
+        let manager = DataManager(context: context, flags: featureFlags)
+        let owner = sortedMembers.first { $0.id == selection.responsibleID }
+        manager.updateOwnershipRule(for: day, owner: owner, in: plan)
+        try? context.save()
     }
 }
 

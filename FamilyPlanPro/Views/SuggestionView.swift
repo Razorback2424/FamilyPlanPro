@@ -26,6 +26,7 @@ struct SuggestionView: View {
     @State private var mealInputs: [UUID: String]
     @State private var responsibleSelections: [UUID: ResponsibleSelection]
     @State private var activeAlert: ActiveAlert?
+    @State private var expandedSlotID: UUID?
 
     private var members: [User] {
         plan.family?.members ?? []
@@ -55,6 +56,7 @@ struct SuggestionView: View {
         _mealInputs = State(initialValue: initialMeals)
         _responsibleSelections = State(initialValue: initialResponsible)
         _activeAlert = State(initialValue: nil)
+        _expandedSlotID = State(initialValue: plan.slots.sorted { $0.date < $1.date }.first?.id)
     }
 
     private var cadenceScheduler: GroceryCadenceScheduler {
@@ -63,68 +65,43 @@ struct SuggestionView: View {
 
     var body: some View {
         List {
-            ForEach(sortedSlots) { slot in
-                VStack(alignment: .leading, spacing: 12) {
-                    if let suggestion = savedSuggestion(for: slot) {
-                        Text("Suggested: \(suggestion.mealName)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("suggestion-title-\(slot.id.uuidString)")
-                        Text("Responsible: \(responsibleName(for: suggestion.responsibleUserID))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if featureFlags.mealsOwnershipRules {
-                        Text("Owner: \(slot.owner?.name ?? "Unassigned")")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("owner-title-\(slot.id.uuidString)")
-                    } else {
-                        Text("No saved suggestion yet")
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    MealSlotEntryView(
-                        slot: slot,
-                        members: members,
-                        mealName: Binding(
-                            get: { mealInputs[slot.id, default: ""] },
-                            set: { mealInputs[slot.id] = $0 }
-                        ),
-                        responsibleSelection: Binding(
-                            get: { responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot) },
-                            set: { responsibleSelections[slot.id] = $0 }
-                        ),
-                        onClearSuggestion: {
-                            clearSuggestion(for: slot)
-                        }
-                    )
-                }
-                .padding(.vertical, 8)
-            }
-
-            if featureFlags.mealsOwnershipRules, !members.isEmpty {
-                Section("Ownership Rules") {
-                    Text("These defaults apply to meals without a saved assignment.")
+            if featureFlags.mealsOwnershipRules {
+                Section {
+                    Text("Planner is for meal entry. Edit weekday defaults in Settings.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-
-                    ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
-                        HStack {
-                            Text(day.localizedName)
-                            Spacer()
-                            Picker(day.localizedName, selection: ownershipRuleBinding(for: day)) {
-                                Text("Unassigned").tag(ResponsibleSelection.unassigned)
-                                ForEach(members) { user in
-                                    Text(user.name).tag(ResponsibleSelection.user(user.id))
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .accessibilityIdentifier("ownership-rule-\(day.rawValue)")
-                        }
-                    }
                 }
+            }
+
+            ForEach(sortedSlots) { slot in
+                DisclosureGroup(
+                    isExpanded: Binding(
+                        get: { expandedSlotID == slot.id },
+                        set: { expandedSlotID = $0 ? slot.id : nil }
+                    )
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        MealSlotEntryView(
+                            slot: slot,
+                            members: members,
+                            mealName: Binding(
+                                get: { mealInputs[slot.id, default: ""] },
+                                set: { mealInputs[slot.id] = $0 }
+                            ),
+                            responsibleSelection: Binding(
+                                get: { responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot) },
+                                set: { responsibleSelections[slot.id] = $0 }
+                            ),
+                            onClearSuggestion: {
+                                clearSuggestion(for: slot)
+                            }
+                        )
+                    }
+                    .padding(.top, 8)
+                } label: {
+                    slotSummaryLabel(slot)
+                }
+                .padding(.vertical, 6)
             }
         }
         .navigationTitle("Suggestions")
@@ -163,6 +140,38 @@ struct SuggestionView: View {
         return user.name
     }
 
+    @ViewBuilder
+    private func slotSummaryLabel(_ slot: MealSlot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
+                .font(.headline)
+
+            Text(slot.date.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if let suggestion = savedSuggestion(for: slot) {
+                Text("Suggested: \(suggestion.mealName)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("suggestion-title-\(slot.id.uuidString)")
+                Text("Responsible: \(responsibleName(for: suggestion.responsibleUserID))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if featureFlags.mealsOwnershipRules {
+                Text("Default owner: \(slot.owner?.name ?? "Unassigned")")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("owner-title-\(slot.id.uuidString)")
+            } else {
+                Text("No saved suggestion yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     private func defaultResponsibleSelection(for slot: MealSlot) -> ResponsibleSelection {
         if let responsibleID = slot.pendingSuggestion?.responsibleUserID ?? slot.finalizedSuggestion?.responsibleUserID {
             return .user(responsibleID)
@@ -175,21 +184,6 @@ struct SuggestionView: View {
 
     private func savedSuggestion(for slot: MealSlot) -> MealSuggestion? {
         slot.pendingSuggestion ?? slot.finalizedSuggestion
-    }
-
-    private func ownershipRuleBinding(for day: DayOfWeek) -> Binding<ResponsibleSelection> {
-        Binding(
-            get: { ownershipRuleSelection(for: day) },
-            set: { updateOwnershipRule(for: day, selection: $0) }
-        )
-    }
-
-    private func ownershipRuleSelection(for day: DayOfWeek) -> ResponsibleSelection {
-        guard let ruleID = plan.ownershipRulesSnap?.rules[String(day.rawValue)],
-              let ownerUUID = UUID(uuidString: ruleID) else {
-            return .unassigned
-        }
-        return .user(ownerUUID)
     }
 
     private func syncStateFromPlan() {
@@ -264,20 +258,6 @@ struct SuggestionView: View {
 
     private func responsibleSelection(for slot: MealSlot) -> ResponsibleSelection {
         responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot)
-    }
-
-    private func updateOwnershipRule(for day: DayOfWeek, selection: ResponsibleSelection) {
-        let manager = DataManager(context: context,
-                                  flags: featureFlags,
-                                  groceryCadenceScheduler: cadenceScheduler)
-        let owner = members.first { $0.id == selection.responsibleID }
-        manager.updateOwnershipRule(for: day, owner: owner, in: plan)
-
-        for slot in sortedSlots where slot.dayOfWeek == day && savedSuggestion(for: slot) == nil {
-            responsibleSelections[slot.id] = owner.map { .user($0.id) } ?? .unassigned
-        }
-
-        try? context.save()
     }
 
     private func clearSuggestion(for slot: MealSlot) {
