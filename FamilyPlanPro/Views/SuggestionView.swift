@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Observation
 
 enum ResponsibleSelection: Hashable {
     case unassigned
@@ -36,6 +35,18 @@ struct SuggestionView: View {
         plan.slots.sorted { $0.date < $1.date }
     }
 
+    private var completedMealCount: Int {
+        sortedSlots.filter { savedSuggestion(for: $0) != nil }.count
+    }
+
+    private var remainingMealCount: Int {
+        max(0, sortedSlots.count - completedMealCount)
+    }
+
+    private var firstIncompleteSlotID: UUID? {
+        sortedSlots.first(where: { savedSuggestion(for: $0) == nil })?.id
+    }
+
     init(plan: WeeklyPlan, currentUser: User?) {
         self._plan = Bindable(wrappedValue: plan)
         self.currentUser = currentUser
@@ -64,46 +75,41 @@ struct SuggestionView: View {
     }
 
     var body: some View {
-        List {
-            if featureFlags.mealsOwnershipRules {
-                Section {
-                    Text("Planner is for meal entry. Edit weekday defaults in Settings.")
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(completedMealCount) of \(sortedSlots.count) planned")
+                        .font(.headline)
+                    Text(remainingMealCount == 0
+                         ? "This week is ready for review."
+                         : "\(remainingMealCount) left this week.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-            }
-
-            ForEach(sortedSlots) { slot in
-                DisclosureGroup(
-                    isExpanded: Binding(
-                        get: { expandedSlotID == slot.id },
-                        set: { expandedSlotID = $0 ? slot.id : nil }
-                    )
-                ) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        MealSlotEntryView(
-                            slot: slot,
-                            members: members,
-                            mealName: Binding(
-                                get: { mealInputs[slot.id, default: ""] },
-                                set: { mealInputs[slot.id] = $0 }
-                            ),
-                            responsibleSelection: Binding(
-                                get: { responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot) },
-                                set: { responsibleSelections[slot.id] = $0 }
-                            ),
-                            onClearSuggestion: {
-                                clearSuggestion(for: slot)
-                            }
-                        )
+                    if let firstIncompleteSlotID {
+                        Button("Open Next Meal") {
+                            expandedSlotID = firstIncompleteSlotID
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .padding(.top, 8)
-                } label: {
-                    slotSummaryLabel(slot)
                 }
-                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                ForEach(sortedSlots) { slot in
+                    SuggestionSlotRow(
+                        slot: slot,
+                        members: members,
+                        mealName: mealBinding(for: slot),
+                        responsibleSelection: responsibleBinding(for: slot),
+                        isExpanded: expandedBinding(for: slot),
+                        onClearSuggestion: { clearSuggestion(for: slot) },
+                        slotSummaryLabel: { slotSummaryLabel(slot) }
+                    )
+                }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle("Suggestions")
         .toolbar {
             Button("Save Changes") {
@@ -122,9 +128,15 @@ struct SuggestionView: View {
         }
         .onAppear {
             syncStateFromPlan()
+            if expandedSlotID == nil {
+                expandedSlotID = firstIncompleteSlotID ?? sortedSlots.first?.id
+            }
         }
         .onChange(of: plan.slots.count) { _, _ in
             syncStateFromPlan()
+            if expandedSlotID == nil {
+                expandedSlotID = firstIncompleteSlotID ?? sortedSlots.first?.id
+            }
         }
         .alert(item: $activeAlert) { alert in
             Alert(title: Text(alert.title),
@@ -142,31 +154,39 @@ struct SuggestionView: View {
 
     @ViewBuilder
     private func slotSummaryLabel(_ slot: MealSlot) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
-                .font(.headline)
+        let suggestion = savedSuggestion(for: slot)
+        let isComplete = suggestion != nil
 
-            Text(slot.date.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(slot.dayOfWeek.localizedName) \(slot.mealType.displayName)")
+                        .font(.headline)
 
-            if let suggestion = savedSuggestion(for: slot) {
-                Text("Suggested: \(suggestion.mealName)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("suggestion-title-\(slot.id.uuidString)")
-                Text("Responsible: \(responsibleName(for: suggestion.responsibleUserID))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else if featureFlags.mealsOwnershipRules {
-                Text("Default owner: \(slot.owner?.name ?? "Unassigned")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("owner-title-\(slot.id.uuidString)")
-            } else {
-                Text("No saved suggestion yet")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    Text(slot.date.formatted(.dateTime.month(.abbreviated).day()))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    if let suggestion {
+                        Text(suggestion.mealName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("suggestion-title-\(slot.id.uuidString)")
+                        Text(responsibleName(for: suggestion.responsibleUserID))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Text(isComplete ? "Planned" : "Open")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(isComplete ? Color.green.opacity(0.12) : Color.secondary.opacity(0.12))
+                    .foregroundStyle(isComplete ? .green : .secondary)
+                    .clipShape(Capsule())
             }
         }
         .padding(.vertical, 4)
@@ -184,6 +204,27 @@ struct SuggestionView: View {
 
     private func savedSuggestion(for slot: MealSlot) -> MealSuggestion? {
         slot.pendingSuggestion ?? slot.finalizedSuggestion
+    }
+
+    private func mealBinding(for slot: MealSlot) -> Binding<String> {
+        Binding(
+            get: { mealInputs[slot.id, default: ""] },
+            set: { mealInputs[slot.id] = $0 }
+        )
+    }
+
+    private func responsibleBinding(for slot: MealSlot) -> Binding<ResponsibleSelection> {
+        Binding(
+            get: { responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot) },
+            set: { responsibleSelections[slot.id] = $0 }
+        )
+    }
+
+    private func expandedBinding(for slot: MealSlot) -> Binding<Bool> {
+        Binding(
+            get: { expandedSlotID == slot.id },
+            set: { expandedSlotID = $0 ? slot.id : nil }
+        )
     }
 
     private func syncStateFromPlan() {
@@ -223,6 +264,14 @@ struct SuggestionView: View {
 
         for (slot, trimmedName) in trimmedInputs {
             if trimmedName.isEmpty {
+                if slot.pendingSuggestion != nil {
+                    manager.clearSuggestion(for: slot)
+                }
+                mealInputs[slot.id] = ""
+                responsibleSelections[slot.id] = defaultResponsibleSelection(for: slot)
+                if expandedSlotID == slot.id {
+                    expandedSlotID = firstIncompleteSlotID ?? sortedSlots.first?.id
+                }
                 continue
             }
             let selection = responsibleSelections[slot.id] ?? defaultResponsibleSelection(for: slot)
@@ -242,6 +291,11 @@ struct SuggestionView: View {
 
             mealInputs[slot.id] = trimmedName
             responsibleSelections[slot.id] = selection
+            if expandedSlotID == slot.id,
+               let nextOpenSlotID = firstIncompleteSlotID,
+               nextOpenSlotID != slot.id {
+                expandedSlotID = nextOpenSlotID
+            }
         }
 
         plan.lastModifiedByUserID = currentUser?.id
@@ -307,6 +361,40 @@ struct SuggestionView: View {
                 return "This meal day has no owner. Choose a responsible person before saving or submitting."
             }
         }
+    }
+}
+
+private struct SuggestionSlotRow<SummaryLabel: View>: View {
+    let slot: MealSlot
+    let members: [User]
+    @Binding var mealName: String
+    @Binding var responsibleSelection: ResponsibleSelection
+    @Binding var isExpanded: Bool
+    let onClearSuggestion: () -> Void
+    let slotSummaryLabel: () -> SummaryLabel
+
+    var body: some View {
+        DisclosureGroup(
+            isExpanded: $isExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                MealSlotEntryView(
+                    slot: slot,
+                    members: members,
+                    mealName: $mealName,
+                    responsibleSelection: $responsibleSelection,
+                    onClearSuggestion: onClearSuggestion
+                )
+            }
+            .padding(.top, 8)
+        } label: {
+            slotSummaryLabel()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal)
     }
 }
 

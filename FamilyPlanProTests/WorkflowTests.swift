@@ -369,6 +369,33 @@ final class WorkflowTests: XCTestCase {
         XCTAssertEqual(plan.groceryList?.items.count, 7)
     }
 
+    func testClearingPendingSuggestionRemovesSavedMealAndRestoresDefaultOwner() throws {
+        let container = try makeContainer()
+        let manager = DataManager(context: container.mainContext, flags: makeStage1Flags())
+        let family = manager.createFamily(name: "Test")
+        let userA = manager.addUser(name: "Alice", to: family)
+        let userB = manager.addUser(name: "Bob", to: family)
+
+        let plan = manager.getOrCreateCurrentWeekPlan(for: family)
+        let mondaySlot = try XCTUnwrap(plan.slots.first(where: { $0.dayOfWeek == .monday }))
+        let defaultOwnerID = mondaySlot.owner?.id
+
+        _ = manager.setPendingSuggestion(mealName: "Tacos",
+                                         responsibleUser: userB,
+                                         author: userA,
+                                         for: mondaySlot)
+        XCTAssertEqual(mondaySlot.pendingSuggestion?.mealName, "Tacos")
+        XCTAssertEqual(mondaySlot.owner?.id, userB.id)
+
+        manager.clearSuggestion(for: mondaySlot)
+
+        let suggestions = try container.mainContext.fetch(FetchDescriptor<MealSuggestion>())
+        XCTAssertNil(mondaySlot.pendingSuggestion)
+        XCTAssertNil(mondaySlot.finalizedSuggestion)
+        XCTAssertEqual(mondaySlot.owner?.id, defaultOwnerID)
+        XCTAssertTrue(suggestions.isEmpty)
+    }
+
     func testFinalizeGeneratesSingleGroceryListGroupedByDay() throws {
         let container = try makeContainer()
         let scheduler = RecordingNotificationScheduler()

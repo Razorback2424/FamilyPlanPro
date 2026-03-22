@@ -94,6 +94,7 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Grocery List")
+            .scrollDismissesKeyboard(.interactively)
             .onAppear {
                 observedItemCount = list.items.count
                 reconcileCadence()
@@ -117,7 +118,7 @@ struct GroceryListView: View {
                     addItem()
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .overlay(alignment: .bottom) {
                 if let pendingUndoDeletion {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -138,6 +139,9 @@ struct GroceryListView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 12)
                     .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
                 }
             }
         }
@@ -225,6 +229,7 @@ private struct GroceryItemRow: View {
     @Bindable var item: GroceryItem
     let availableDays: [Date]
     let isNewestItem: Bool
+    @State private var showingDayOptions = false
 
     private var dayLabel: String {
         guard let day = item.dayRef else {
@@ -238,17 +243,12 @@ private struct GroceryItemRow: View {
             TextField("Item", text: $item.name)
                 .textInputAutocapitalization(.words)
                 .disableAutocorrection(true)
+                .autocorrectionDisabled()
                 .accessibilityIdentifier(item.name.isEmpty && isNewestItem ? "grocery-item-new" : (item.name.isEmpty ? "grocery-item-empty" : "grocery-item-name"))
-            Menu(dayLabel) {
-                Button("Unscheduled") {
-                    updateDay(nil)
-                }
-                ForEach(availableDays, id: \.self) { day in
-                    Button(day.formatted(.dateTime.weekday(.wide))) {
-                        updateDay(day)
-                    }
-                }
+            Button(dayLabel) {
+                showingDayOptions = true
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("grocery-item-day")
             Toggle("Checked", isOn: $item.checked)
                 .labelsHidden()
@@ -259,6 +259,19 @@ private struct GroceryItemRow: View {
         }
         .onChange(of: item.checked) { _, _ in
             try? context.save()
+        }
+        .confirmationDialog("Assign Grocery Day",
+                            isPresented: $showingDayOptions,
+                            titleVisibility: .visible) {
+            Button("Unscheduled") {
+                updateDay(nil)
+            }
+            ForEach(availableDays, id: \.self) { day in
+                Button(day.formatted(.dateTime.weekday(.wide))) {
+                    updateDay(day)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 

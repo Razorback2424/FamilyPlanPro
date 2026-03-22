@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import Observation
 
 struct MealSlotEntryView: View {
     private static let simpleFridayTemplates = [
@@ -11,75 +10,118 @@ struct MealSlotEntryView: View {
     ]
 
     @Environment(\.featureFlags) private var featureFlags
-    @Bindable var slot: MealSlot
+    let slot: MealSlot
     var members: [User]
     @Binding var mealName: String
     @Binding var responsibleSelection: ResponsibleSelection
     var onClearSuggestion: (() -> Void)?
+    @State private var draftMealName: String
+    @State private var showingTemplateOptions = false
+    @State private var showingResponsibleOptions = false
+    @FocusState private var isMealNameFocused: Bool
 
     init(slot: MealSlot,
          members: [User],
          mealName: Binding<String>,
          responsibleSelection: Binding<ResponsibleSelection>,
          onClearSuggestion: (() -> Void)? = nil) {
-        self._slot = Bindable(wrappedValue: slot)
+        self.slot = slot
         self.members = members
         self._mealName = mealName
         self._responsibleSelection = responsibleSelection
         self.onClearSuggestion = onClearSuggestion
+        self._draftMealName = State(initialValue: mealName.wrappedValue)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(slot.date, format: .dateTime.weekday(.wide)) \(slot.mealType.displayName)")
-                    .font(.headline)
-                Text(slot.date, format: .dateTime.month().day())
+            if featureFlags.mealsOwnershipRules, slot.isSimple {
+                Text("Simple Friday")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if featureFlags.mealsOwnershipRules, let owner = slot.owner {
-                    Text("Default owner: \(owner.name)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if featureFlags.mealsOwnershipRules, slot.isSimple {
-                    Text("Simple Friday")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
-            TextField("Meal name", text: $mealName)
+            TextField("Meal name", text: $draftMealName)
                 .textFieldStyle(.roundedBorder)
-
-            if featureFlags.mealsOwnershipRules, slot.isSimple {
-                Menu("Use Simple Friday Template") {
-                    ForEach(Self.simpleFridayTemplates, id: \.self) { template in
-                        Button(template) {
-                            mealName = template
-                        }
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .textContentType(.none)
+                .submitLabel(.done)
+                .focused($isMealNameFocused)
+                .onSubmit(commitDraft)
+                .onChange(of: isMealNameFocused) { _, isFocused in
+                    if !isFocused {
+                        commitDraft()
                     }
                 }
+                .onChange(of: mealName) { _, newValue in
+                    if !isMealNameFocused {
+                        draftMealName = newValue
+                    }
+                }
+
+            if featureFlags.mealsOwnershipRules, slot.isSimple {
+                Button("Use Simple Friday Template") {
+                    showingTemplateOptions = true
+                }
+                .buttonStyle(.bordered)
                 .accessibilityIdentifier("simple-friday-template-\(slot.id.uuidString)")
             }
 
-            Picker("Responsible", selection: $responsibleSelection) {
-                Text("Unassigned").tag(ResponsibleSelection.unassigned)
-                ForEach(members) { user in
-                    Text(user.name).tag(ResponsibleSelection.user(user.id))
+            HStack {
+                Text("Responsible")
+                Spacer()
+                Button(responsibleLabel) {
+                    showingResponsibleOptions = true
                 }
+                .buttonStyle(.bordered)
             }
-            .pickerStyle(.menu)
 
             if let onClearSuggestion,
                slot.pendingSuggestion != nil {
-                Button("Clear Saved Suggestion") {
+                Button("Clear Meal") {
                     onClearSuggestion()
                 }
                 .buttonStyle(.bordered)
             }
         }
         .accessibilityIdentifier("slot-entry-\(slot.id.uuidString)")
+        .confirmationDialog("Choose a Simple Friday Template",
+                            isPresented: $showingTemplateOptions,
+                            titleVisibility: .visible) {
+            ForEach(Self.simpleFridayTemplates, id: \.self) { template in
+                Button(template) {
+                    mealName = template
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Assign a Responsible Person",
+                            isPresented: $showingResponsibleOptions,
+                            titleVisibility: .visible) {
+            Button("Unassigned") {
+                responsibleSelection = .unassigned
+            }
+            ForEach(members) { user in
+                Button(user.name) {
+                    responsibleSelection = .user(user.id)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var responsibleLabel: String {
+        switch responsibleSelection {
+        case .unassigned:
+            return "Unassigned"
+        case .user(let id):
+            return members.first(where: { $0.id == id })?.name ?? "Unassigned"
+        }
+    }
+
+    private func commitDraft() {
+        mealName = draftMealName
     }
 }
 

@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Stage 1: Keep meal-name drafts local to the row and commit them on blur/submit to reduce SwiftUI input churn in Suggestions.
 - Tests: Unify UITEST_STATUS and debug-route launch parsing behind one shared mapping and add parity coverage for the review launch path.
 - Stage 1: Add household weekday meal-owner defaults in Family Settings so new weeks inherit the household's preferred ownership pattern.
 - Stage 1: Block saving or submitting a meal suggestion when ownership rules leave that day unassigned, with a targeted ownership alert and UI coverage.

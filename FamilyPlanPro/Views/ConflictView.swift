@@ -53,6 +53,8 @@ struct ConflictView: View {
             Form {
                 Section("Final decision") {
                     TextField("Meal name", text: $finalMealName)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
                     Picker("Responsible", selection: Binding(get: {
                         selectedResponsible
                     }, set: { newValue in
@@ -75,6 +77,8 @@ struct ConflictView: View {
                         }
                     }
                     TextField("Notes (optional)", text: $resolutionNotes)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled()
                 }
                 if let current = activeSlot?.pendingSuggestion,
                    let authorName = members.first(where: { $0.id == current.authorUserID })?.name,

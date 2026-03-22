@@ -27,6 +27,7 @@ struct FamilySettingsView: View {
             Section("Household") {
                 TextField("Household name", text: $family.name)
                     .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
             }
 
             Section("Members") {

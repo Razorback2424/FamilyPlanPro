@@ -50,8 +50,12 @@ struct FinalizedView: View {
                         .accessibilityIdentifier("budget-status-label")
                     TextField("Weekly budget ($)", text: $budgetTarget)
                         .keyboardType(.numberPad)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                     TextField("Observed spend ($)", text: $observedSpend)
                         .keyboardType(.numberPad)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                     Button("Update Budget") {
                         let manager = DataManager(context: context,
                                                   flags: featureFlags,

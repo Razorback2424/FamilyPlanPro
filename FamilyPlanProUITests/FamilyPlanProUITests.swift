@@ -23,6 +23,24 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testMealNameFieldFocusDoesNotTriggerReporterDisconnectWarning() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "suggestionMode"
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars["Suggestions"].waitForExistence(timeout: 2))
+
+        let mealField = app.textFields["Meal name"].firstMatch
+        XCTAssertTrue(mealField.waitForExistence(timeout: 2))
+        mealField.tap()
+
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2))
+        mealField.typeText("Soup")
+        XCTAssertTrue(((mealField.value as? String) ?? "").contains("Soup"))
+    }
+
+    @MainActor
     func testPlannerDisplaysReviewView() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"

@@ -32,6 +32,7 @@ struct AddFamilyView: View {
             Section(header: Text("Family Details")) {
                 TextField("Family Name", text: $name)
                     .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: .familyName)
             }
@@ -40,6 +41,7 @@ struct AddFamilyView: View {
                 HStack {
                     TextField("Member Name", text: $memberName)
                         .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
                         .textFieldStyle(.roundedBorder)
                         .focused($focusedField, equals: .memberName)
                         .onSubmit(addMember)

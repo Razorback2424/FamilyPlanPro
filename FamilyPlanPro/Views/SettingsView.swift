@@ -9,7 +9,8 @@ struct SettingsView: View {
 
     @State private var budgetTarget: String = ""
     @State private var observedSpend: String = ""
-    @State private var showingFamilySettings = false
+    @State private var isOwnershipDefaultsExpanded = false
+    @State private var isBudgetExpanded = false
 
     private var family: Family? {
         families.first
@@ -54,95 +55,14 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Household members") {
-                if let userA {
-                    TextField("Primary member", text: Binding(
-                        get: { userA.name },
-                        set: { userA.name = $0 }
-                    ))
-                } else {
-                    Text("Primary member")
-                        .foregroundStyle(.secondary)
-                }
-
-                if let userB {
-                    TextField("Secondary member", text: Binding(
-                        get: { userB.name },
-                        set: { userB.name = $0 }
-                    ))
-                } else {
-                    Text("Secondary member")
-                        .foregroundStyle(.secondary)
-                }
-
-                Button("Save household names") {
-                    try? context.save()
-                }
-
-                if family != nil {
-                    Button("Edit household defaults") {
-                        showingFamilySettings = true
-                    }
-                    Text("Household defaults apply to future weeks.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            householdMembersSection
 
             if featureFlags.mealsOwnershipRules, let plan = currentPlan {
-                Section("This Week Meal Defaults") {
-                    if sortedMembers.isEmpty {
-                        Text("Add household members before assigning default owners for this week.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
-                            Picker(day.localizedName, selection: currentWeekOwnershipBinding(for: day, in: plan)) {
-                                Text("Unassigned").tag(ResponsibleSelection.unassigned)
-                                ForEach(sortedMembers) { member in
-                                    Text(member.name).tag(ResponsibleSelection.user(member.id))
-                                }
-                            }
-                            .accessibilityIdentifier("settings-ownership-rule-\(day.rawValue)")
-                        }
-                    }
-                    Text("These defaults apply only to meals without a saved assignment in the current week.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Household defaults for future weeks live in Family Settings.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("settings-household-defaults-hint")
-                    Text("Open Planner to update individual meals.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("settings-weekly-ownership-hint")
-                }
+                currentWeekDefaultsSection(plan: plan)
             }
 
             if featureFlags.mealsBudgetStatus, let plan = currentPlan {
-                Section("Budget") {
-                    TextField("Weekly budget", text: $budgetTarget)
-                        .keyboardType(.numberPad)
-                    TextField("Planned spend", text: $observedSpend)
-                        .keyboardType(.numberPad)
-                        .disabled(!canEditObservedSpend)
-                    if !canEditObservedSpend {
-                        Text("Finish the week's meals to create a grocery list before entering spend.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text("Budget status: \(plan.budgetStatus.rawValue.capitalized)")
-                        .font(.caption)
-                        .foregroundStyle(budgetStatusColor)
-                    Button("Save budget") {
-                        let manager = DataManager(context: context, flags: featureFlags)
-                        let targetValue = Int(budgetTarget) ?? 0
-                        let observedValue = Int(observedSpend) ?? 0
-                        manager.updateBudgetTarget(for: plan, dollars: targetValue)
-                        manager.updateObservedBudget(for: plan, dollars: observedValue)
-                        try? context.save()
-                    }
-                }
+                budgetSection(plan: plan)
             }
         }
         .navigationTitle("Settings")
@@ -151,21 +71,109 @@ struct SettingsView: View {
             let family = manager.getOrCreateDefaultFamily()
             manager.ensureDefaultUsersIfNeeded(for: family)
             syncBudgetFields()
+            syncDisclosureDefaults()
             try? context.save()
         }
         .onChange(of: currentPlan?.id) { _, _ in
             syncBudgetFields()
+            syncDisclosureDefaults()
         }
         .onChange(of: currentPlan?.groceryList?.id) { _, _ in
             syncBudgetFields()
         }
-        .sheet(isPresented: $showingFamilySettings) {
-            if let family {
-                NavigationStack {
-                    FamilySettingsView(family: family)
+        .onChange(of: family?.name) { _, _ in
+            try? context.save()
+        }
+        .onChange(of: userA?.name) { _, _ in
+            try? context.save()
+        }
+        .onChange(of: userB?.name) { _, _ in
+            try? context.save()
+        }
+    }
+
+    private func syncDisclosureDefaults() {
+        isOwnershipDefaultsExpanded = false
+        isBudgetExpanded = false
+    }
+
+    @ViewBuilder
+    private var householdMembersSection: some View {
+        Section("Household members") {
+            if let userA {
+                TextField("Primary member", text: Binding(
+                    get: { userA.name },
+                    set: { userA.name = $0 }
+                ))
+                .autocorrectionDisabled()
+            } else {
+                Text("Primary member")
+                    .foregroundStyle(.secondary)
+            }
+
+            if let userB {
+                TextField("Secondary member", text: Binding(
+                    get: { userB.name },
+                    set: { userB.name = $0 }
+                ))
+                .autocorrectionDisabled()
+            } else {
+                Text("Secondary member")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func currentWeekDefaultsSection(plan: WeeklyPlan) -> some View {
+        DisclosureGroup("This Week Meal Defaults", isExpanded: $isOwnershipDefaultsExpanded) {
+            if sortedMembers.isEmpty {
+                EmptyView()
+            } else {
+                ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
+                    Picker(day.localizedName, selection: currentWeekOwnershipBinding(for: day, in: plan)) {
+                        Text("Unassigned").tag(ResponsibleSelection.unassigned)
+                        ForEach(sortedMembers) { member in
+                            Text(member.name).tag(ResponsibleSelection.user(member.id))
+                        }
+                    }
+                    .accessibilityIdentifier("settings-ownership-rule-\(day.rawValue)")
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func budgetSection(plan: WeeklyPlan) -> some View {
+        DisclosureGroup("Budget", isExpanded: $isBudgetExpanded) {
+            TextField("Weekly budget", text: $budgetTarget)
+                .keyboardType(.numberPad)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            TextField("Planned spend", text: $observedSpend)
+                .keyboardType(.numberPad)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .disabled(!canEditObservedSpend)
+            Text("Status: \(plan.budgetStatus.rawValue.capitalized)")
+                .font(.caption)
+                .foregroundStyle(budgetStatusColor)
+        }
+        .onChange(of: budgetTarget) { _, newValue in
+            saveBudgetFieldsIfNeeded(plan: plan, budgetTargetText: newValue, observedSpendText: observedSpend)
+        }
+        .onChange(of: observedSpend) { _, newValue in
+            saveBudgetFieldsIfNeeded(plan: plan, budgetTargetText: budgetTarget, observedSpendText: newValue)
+        }
+    }
+
+    private func saveBudgetFieldsIfNeeded(plan: WeeklyPlan, budgetTargetText: String, observedSpendText: String) {
+        let manager = DataManager(context: context, flags: featureFlags)
+        let targetValue = Int(budgetTargetText) ?? 0
+        let observedValue = Int(observedSpendText) ?? 0
+        manager.updateBudgetTarget(for: plan, dollars: targetValue)
+        manager.updateObservedBudget(for: plan, dollars: observedValue)
+        try? context.save()
     }
 
     private func syncBudgetFields() {

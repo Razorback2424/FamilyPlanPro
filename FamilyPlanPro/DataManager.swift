@@ -226,6 +226,17 @@ final class DataManager {
         plan.lastModifiedByUserID = user.id
     }
 
+    func clearSuggestion(for slot: MealSlot) {
+        removePendingSuggestion(from: slot)
+        if let family = slot.plan?.family,
+           let ownerID = slot.plan?.ownershipRulesSnap?.rules[String(slot.dayOfWeek.rawValue)],
+           let ownerUUID = UUID(uuidString: ownerID) {
+            slot.owner = family.members.first(where: { $0.id == ownerUUID })
+        } else {
+            slot.owner = nil
+        }
+    }
+
     func reopenPlanToSuggestion(_ plan: WeeklyPlan) {
         plan.status = .suggestionMode
         if flags.mealsGroceryList, let list = plan.groceryList {
