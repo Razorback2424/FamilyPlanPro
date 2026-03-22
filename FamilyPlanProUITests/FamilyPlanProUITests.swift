@@ -32,6 +32,21 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
+    func testUITestStatusAndDebugRouteShareLaunchMapping() throws {
+        let statusApp = XCUIApplication()
+        statusApp.launchEnvironment["UITEST_RESET"] = "1"
+        statusApp.launchEnvironment["UITEST_STATUS"] = "reviewMode"
+        statusApp.launch()
+        XCTAssertTrue(statusApp.navigationBars["Review"].waitForExistence(timeout: 2))
+        statusApp.terminate()
+
+        let routeApp = XCUIApplication()
+        routeApp.launchArguments = ["-ui_debug_route", "review"]
+        routeApp.launch()
+        XCTAssertTrue(routeApp.navigationBars["Review"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testPlannerDisplaysFinalizedViewWithGroceryList() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"
@@ -46,7 +61,7 @@ final class FamilyPlanProUITests: XCTestCase {
     }
 
     @MainActor
-    func testFinalizedGroceryFlowSupportsGroupedListAndManualItemEdit() throws {
+    func testFinalizedGroceryFlowOpensGroupedSectionsAndAllowsItemEdit() throws {
         let app = XCUIApplication()
         app.launchEnvironment["UITEST_RESET"] = "1"
         app.launchEnvironment["UITEST_STATUS"] = "finalized"
@@ -57,18 +72,103 @@ final class FamilyPlanProUITests: XCTestCase {
         groceryLink.tap()
 
         XCTAssertTrue(app.navigationBars["Grocery List"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.otherElements["grocery-section-1"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.otherElements["grocery-section-2"].waitForExistence(timeout: 2))
+        let weekdayHeaders = Set(Calendar.current.weekdaySymbols)
+        let visibleWeekdayHeaders = Set(app.staticTexts.allElementsBoundByIndex.map(\.label)).intersection(weekdayHeaders)
+        XCTAssertGreaterThanOrEqual(visibleWeekdayHeaders.count, 2)
 
         let addButton = app.buttons["Add Item"]
         XCTAssertTrue(addButton.waitForExistence(timeout: 2))
+
+        let itemFieldsBeforeAdd = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH %@", "grocery-item-"))
+        let initialItemCount = itemFieldsBeforeAdd.count
         addButton.tap()
 
-        let emptyItemField = app.textFields["grocery-item-empty"].firstMatch
-        XCTAssertTrue(emptyItemField.waitForExistence(timeout: 2))
-        emptyItemField.tap()
-        emptyItemField.typeText("Bananas")
-        XCTAssertEqual(emptyItemField.value as? String, "Bananas")
+        let itemFieldsAfterAdd = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH %@", "grocery-item-"))
+        var pollAttempts = 0
+        while itemFieldsAfterAdd.count <= initialItemCount && pollAttempts < 10 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            pollAttempts += 1
+        }
+
+        let newestField = itemFieldsAfterAdd.allElementsBoundByIndex.last ?? itemFieldsAfterAdd.element(boundBy: itemFieldsAfterAdd.count - 1)
+        XCTAssertTrue(newestField.waitForExistence(timeout: 2))
+        if !newestField.isHittable {
+            app.swipeUp()
+        }
+        newestField.tap()
+        newestField.typeText("Bananas")
+        if app.keyboards.firstMatch.exists {
+            if app.keyboards.buttons["Return"].exists {
+                app.keyboards.buttons["Return"].tap()
+            } else if app.keyboards.buttons["Done"].exists {
+                app.keyboards.buttons["Done"].tap()
+            }
+        }
+        XCTAssertTrue(((newestField.value as? String) ?? "").contains("Bananas"))
+    }
+
+    @MainActor
+    func testFinalizedGroceryDeleteUndoRestoresDeletedItem() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["UITEST_RESET"] = "1"
+        app.launchEnvironment["UITEST_STATUS"] = "finalized"
+        app.launch()
+
+        let groceryLink = app.buttons["Grocery List"]
+        XCTAssertTrue(groceryLink.waitForExistence(timeout: 2))
+        groceryLink.tap()
+
+        XCTAssertTrue(app.navigationBars["Grocery List"].waitForExistence(timeout: 2))
+
+        let addButton = app.buttons["Add Item"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 2))
+
+        let itemFieldsBeforeAdd = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH %@", "grocery-item-"))
+        let initialItemCount = itemFieldsBeforeAdd.count
+        addButton.tap()
+
+        let itemFieldsAfterAdd = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH %@", "grocery-item-"))
+        var pollAttempts = 0
+        while itemFieldsAfterAdd.count <= initialItemCount && pollAttempts < 10 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            pollAttempts += 1
+        }
+
+        let newestField = itemFieldsAfterAdd.allElementsBoundByIndex.last ?? itemFieldsAfterAdd.element(boundBy: itemFieldsAfterAdd.count - 1)
+        XCTAssertTrue(newestField.waitForExistence(timeout: 2))
+        var swipeAttempts = 0
+        while !newestField.isHittable && swipeAttempts < 4 {
+            app.swipeUp()
+            swipeAttempts += 1
+        }
+        XCTAssertTrue(newestField.isHittable)
+        newestField.tap()
+        let deletedItemName = "Oranges"
+        newestField.typeText(deletedItemName)
+        if app.keyboards.firstMatch.exists {
+            if app.keyboards.buttons["Return"].exists {
+                app.keyboards.buttons["Return"].tap()
+            } else if app.keyboards.buttons["Done"].exists {
+                app.keyboards.buttons["Done"].tap()
+            }
+        }
+
+        XCTAssertTrue(((newestField.value as? String) ?? "").contains(deletedItemName))
+
+        newestField.swipeLeft()
+        let deleteButton = app.buttons["Delete"].firstMatch
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 2))
+        deleteButton.tap()
+
+        let undoButton = app.buttons["Undo"].firstMatch
+        XCTAssertTrue(undoButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Grocery item deleted"].waitForExistence(timeout: 2))
+        undoButton.tap()
+
+        let restoredField = app.textFields.matching(NSPredicate(format: "value CONTAINS %@", deletedItemName)).firstMatch
+        XCTAssertTrue(restoredField.waitForExistence(timeout: 2))
+        XCTAssertTrue(((restoredField.value as? String) ?? "").contains(deletedItemName))
+        XCTAssertFalse(app.staticTexts["Grocery item deleted"].exists)
     }
 
     @MainActor

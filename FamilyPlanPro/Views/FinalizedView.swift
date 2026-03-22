@@ -132,7 +132,7 @@ struct FinalizedView: View {
         guard !list.items.isEmpty else {
             return "Add grocery items to get reminders this week."
         }
-        return "You’ll get grocery reminders on Sunday and Thursday."
+        return "You’ll get grocery reminders on the remaining reminder days this week."
     }
 
     private func syncBudgetFields() {

@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
+- Tests: Unify UITEST_STATUS and debug-route launch parsing behind one shared mapping and add parity coverage for the review launch path.
 - Stage 1: Add household weekday meal-owner defaults in Family Settings so new weeks inherit the household's preferred ownership pattern.
 - Stage 1: Block saving or submitting a meal suggestion when ownership rules leave that day unassigned, with a targeted ownership alert and UI coverage.
 - Stage 1: Let manual grocery items be assigned to a specific day so grouped grocery sections stay useful after edits.
@@ -12,6 +13,7 @@
 - Stage 1: Make grocery cadence timing deterministic under test and cover the remaining-days-only Sun/Thu scheduling rules.
 - Stage 1: Cancel stale Sun/Thu grocery cadence notifications whenever a grocery list becomes ineligible for the current week.
 - Stage 1: Add grocery-list accessibility hooks and a UI smoke path for grouped sections plus manual item edits.
+- Stage 1: Add Grocery List empty-state guidance and harden the manual item edit smoke path.
 - Stage 1: Hide ownership-rule and Simple Friday UI affordances when meal ownership rules are turned off.
 - Stage 1: Add one-tap Simple Friday meal templates in the Suggestions flow.
 - Stage 1: Add day-by-day weekly meal ownership editing in the Suggestions flow, with rule changes reapplying to unsaved meals.

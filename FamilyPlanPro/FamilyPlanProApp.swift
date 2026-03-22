@@ -26,9 +26,9 @@ enum DebugLaunchRoute: String {
             .lowercased()
 
         switch normalized {
-        case "suggestion":
+        case "suggestion", "suggestionmode":
             self = .suggestion
-        case "review":
+        case "review", "reviewmode":
             self = .review
         case "conflict":
             self = .conflict
@@ -177,6 +177,10 @@ struct FamilyPlanProApp: App {
 
         if let routeValue = processInfo.environment["UI_DEBUG_ROUTE"] {
             return DebugLaunchRoute(launchValue: routeValue)
+        }
+
+        if let statusValue = processInfo.environment["UITEST_STATUS"] {
+            return DebugLaunchRoute(launchValue: statusValue)
         }
 
         return nil

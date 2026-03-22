@@ -7,6 +7,8 @@ struct GroceryListView: View {
     @Environment(\.featureFlags) private var featureFlags
     @Environment(\.notificationScheduler) private var notificationScheduler
     @Bindable var list: GroceryList
+    @State private var observedItemCount = 0
+    @State private var pendingUndoDeletion: PendingUndoDeletion?
 
     private var dataManager: DataManager {
         DataManager(context: context,
@@ -36,37 +38,107 @@ struct GroceryListView: View {
         return Array(Set(slotDates)).sorted()
     }
 
+    private var totalItemCount: Int {
+        list.items.count
+    }
+
+    private var checkedItemCount: Int {
+        list.items.filter(\.checked).count
+    }
+
+    private var completionSummary: String {
+        if totalItemCount == 0 {
+            return "Start by adding the items you need for this week's meals."
+        }
+
+        if checkedItemCount == 0 {
+            return "\(totalItemCount) item\(totalItemCount == 1 ? "" : "s") on your list so far."
+        }
+
+        return "\(checkedItemCount) of \(totalItemCount) item\(totalItemCount == 1 ? "" : "s") picked up."
+    }
+
     var body: some View {
-        List {
-            if list.items.isEmpty {
-                Text("No items yet.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(groupedItems, id: \.0) { (day, items) in
-                Section(header: sectionHeader(for: day)) {
-                    ForEach(items) { item in
-                        GroceryItemRow(item: item, availableDays: availableDays)
+        ScrollViewReader { proxy in
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Use this list as you shop, and move items to the right day if plans change.")
+                            .font(.subheadline)
+                        Text(completionSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .onDelete { offsets in
-                        deleteItems(at: offsets, in: items)
+                    .padding(.vertical, 4)
+                }
+
+                if list.items.isEmpty {
+                    ContentUnavailableView(
+                        "Your Grocery List Is Empty",
+                        systemImage: "cart",
+                        description: Text("Add the ingredients and household items you need for this week's meals.")
+                    )
+                }
+                ForEach(groupedItems, id: \.0) { (day, items) in
+                    Section(header: sectionHeader(for: day)) {
+                        ForEach(items) { item in
+                            GroceryItemRow(item: item,
+                                           availableDays: availableDays,
+                                           isNewestItem: item === list.items.last)
+                                .id(ObjectIdentifier(item))
+                        }
+                        .onDelete { offsets in
+                            deleteItems(at: offsets, in: items)
+                        }
                     }
                 }
             }
-        }
-        .navigationTitle("Grocery List")
-        .onAppear {
-            reconcileCadence()
-        }
-        .onChange(of: list.items.count) { _, _ in
-            reconcileCadence()
-        }
-        .onDisappear {
-            try? context.save()
-        }
-        .toolbar {
-            Button("Add Item") {
-                addItem()
+            .navigationTitle("Grocery List")
+            .onAppear {
+                observedItemCount = list.items.count
+                reconcileCadence()
+            }
+            .onChange(of: list.items.count) { _, newCount in
+                reconcileCadence()
+                guard newCount > observedItemCount, let newestItem = list.items.last else {
+                    observedItemCount = newCount
+                    return
+                }
+                observedItemCount = newCount
+                withAnimation {
+                    proxy.scrollTo(ObjectIdentifier(newestItem), anchor: .center)
+                }
+            }
+            .onDisappear {
+                try? context.save()
+            }
+            .toolbar {
+                Button("Add Item") {
+                    addItem()
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let pendingUndoDeletion {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Grocery item deleted")
+                                .font(.subheadline.weight(.semibold))
+                            Text(pendingUndoDeletion.items.count == 1 ? "Undo to restore it." : "Undo to restore them.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Button("Undo") {
+                            restoreDeletedItems()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(.thinMaterial)
+                }
             }
         }
     }
@@ -104,11 +176,31 @@ struct GroceryListView: View {
     }
 
     private func deleteItems(at offsets: IndexSet, in items: [GroceryItem]) {
-        for index in offsets {
+        let deletedSnapshots = offsets.compactMap { index -> PendingUndoDeletion.ItemSnapshot? in
+            guard index < items.count else { return nil }
             let item = items[index]
+            let snapshot = PendingUndoDeletion.ItemSnapshot(name: item.name,
+                                                            dayRef: item.dayRef,
+                                                            checked: item.checked)
             list.items.removeAll { $0 === item }
             context.delete(item)
+            return snapshot
         }
+        pendingUndoDeletion = deletedSnapshots.isEmpty ? nil : PendingUndoDeletion(items: deletedSnapshots)
+        try? context.save()
+    }
+
+    private func restoreDeletedItems() {
+        guard let pendingUndoDeletion else { return }
+        for snapshot in pendingUndoDeletion.items {
+            let item = GroceryItem(name: snapshot.name,
+                                   dayRef: snapshot.dayRef,
+                                   checked: snapshot.checked,
+                                   list: list)
+            list.items.append(item)
+            context.insert(item)
+        }
+        self.pendingUndoDeletion = nil
         try? context.save()
     }
 
@@ -118,10 +210,21 @@ struct GroceryListView: View {
     }
 }
 
+private struct PendingUndoDeletion {
+    struct ItemSnapshot {
+        let name: String
+        let dayRef: Date?
+        let checked: Bool
+    }
+
+    let items: [ItemSnapshot]
+}
+
 private struct GroceryItemRow: View {
     @Environment(\.modelContext) private var context
     @Bindable var item: GroceryItem
     let availableDays: [Date]
+    let isNewestItem: Bool
 
     private var dayLabel: String {
         guard let day = item.dayRef else {
@@ -135,7 +238,7 @@ private struct GroceryItemRow: View {
             TextField("Item", text: $item.name)
                 .textInputAutocapitalization(.words)
                 .disableAutocorrection(true)
-                .accessibilityIdentifier(item.name.isEmpty ? "grocery-item-empty" : "grocery-item-name")
+                .accessibilityIdentifier(item.name.isEmpty && isNewestItem ? "grocery-item-new" : (item.name.isEmpty ? "grocery-item-empty" : "grocery-item-name"))
             Menu(dayLabel) {
                 Button("Unscheduled") {
                     updateDay(nil)
