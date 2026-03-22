@@ -123,16 +123,16 @@ struct FinalizedView: View {
 
     private var cadenceStatusText: String {
         guard let list = plan.groceryList else {
-            return "Grocery reminders not scheduled (no list)."
+            return "Finalize this week with a grocery list to get reminders."
         }
         let startOfWeek = Calendar.current.startOfWeek(for: Date())
         guard Calendar.current.isDate(plan.startDate, equalTo: startOfWeek, toGranularity: .day) else {
-            return "Grocery reminders not scheduled (not current week)."
+            return "Grocery reminders only go out for the current week."
         }
         guard !list.items.isEmpty else {
-            return "Grocery reminders not scheduled (empty list)."
+            return "Add grocery items to get reminders this week."
         }
-        return "Grocery reminders scheduled (Sun/Thu)."
+        return "You’ll get grocery reminders on Sunday and Thursday."
     }
 
     private func syncBudgetFields() {

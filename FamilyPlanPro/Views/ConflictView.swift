@@ -64,7 +64,7 @@ struct ConflictView: View {
                         }
                     }
                     if members.count > 1 {
-                        Picker("Decision entered by", selection: Binding(get: {
+                        Picker("Agreed by", selection: Binding(get: {
                             decidingUser
                         }, set: { newValue in
                             decidingUser = newValue
@@ -81,13 +81,13 @@ struct ConflictView: View {
                    let challengerID = plan.lastModifiedByUserID,
                    let challengerName = members.first(where: { $0.id == challengerID })?.name {
                     Section("Context") {
-                        Text("Last update from \(authorName).")
-                        Text("Conflict raised by \(challengerName).")
+                        Text("\(authorName) suggested the current meal.")
+                        Text("\(challengerName) asked to revisit it.")
                             .foregroundStyle(.secondary)
                     }
                 }
                 Section {
-                    Button("Confirm Decision") {
+                    Button("Save Decision") {
                         guard let slot = activeSlot else { return }
                         let manager = DataManager(context: context)
                         let reason = resolutionNotes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,16 +117,16 @@ struct ConflictView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Let's settle these meals together")
+                    Text("A few meals still need a shared decision.")
                         .font(.title3)
-                    Text("Both partners contributed different ideas. Talk it through, agree on a final meal, and record the decision below.")
+                    Text("Review the open items, choose what feels right for the week, and save the final choice.")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
             }
 
             if disputedSlots.isEmpty {
-                Text("No disputed meals remain. Return to review mode when you're ready.")
+                Text("Everything is settled here. You can head back to review whenever you're ready.")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(disputedSlots) { slot in
@@ -140,9 +140,10 @@ struct ConflictView: View {
                                let authorName = members.first(where: { $0.id == authorID })?.name {
                                 Text("Suggested by \(authorName)")
                                     .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
-                        Button("Choose Final Meal") {
+                        Button("Settle This Meal") {
                             openResolution(for: slot)
                         }
                         .buttonStyle(.borderedProminent)

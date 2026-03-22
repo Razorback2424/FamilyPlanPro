@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct WeeklyPlannerContainerView: View {
+    let debugLaunchRoute: DebugLaunchRoute?
     @Environment(\.modelContext) private var context
     @Environment(\.notificationScheduler) private var notificationScheduler
     @Environment(FeatureFlagsStore.self) private var featureFlagsStore
@@ -10,6 +11,10 @@ struct WeeklyPlannerContainerView: View {
 
     @State private var showingAddFamily = false
     @State private var showingFlags = false
+
+    init(debugLaunchRoute: DebugLaunchRoute? = nil) {
+        self.debugLaunchRoute = debugLaunchRoute
+    }
 
     private var currentPlan: WeeklyPlan? {
         let startOfThisWeek = Calendar.current.startOfWeek(for: Date())
@@ -22,15 +27,19 @@ struct WeeklyPlannerContainerView: View {
                 AddFamilyView()
             } else if let plan = currentPlan {
                 let currentUser = plan.family?.members.first
-                switch plan.status {
-                case .suggestionMode:
-                    SuggestionView(plan: plan, currentUser: currentUser)
-                case .reviewMode:
-                    ReviewView(plan: plan)
-                case .conflict:
-                    ConflictView(plan: plan)
-                case .finalized:
-                    FinalizedView(plan: plan)
+                if debugLaunchRoute == .groceryList, let list = plan.groceryList {
+                    GroceryListView(list: list)
+                } else {
+                    switch plan.status {
+                    case .suggestionMode:
+                        SuggestionView(plan: plan, currentUser: currentUser)
+                    case .reviewMode:
+                        ReviewView(plan: plan)
+                    case .conflict:
+                        ConflictView(plan: plan)
+                    case .finalized:
+                        FinalizedView(plan: plan)
+                    }
                 }
             } else {
                 VStack(spacing: 16) {
@@ -62,8 +71,10 @@ struct WeeklyPlannerContainerView: View {
                 }
             }
 #if DEBUG
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Flags") { showingFlags = true }
+            if debugLaunchRoute == nil {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Flags") { showingFlags = true }
+                }
             }
 #endif
         }

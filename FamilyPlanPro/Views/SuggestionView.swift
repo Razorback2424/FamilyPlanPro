@@ -63,29 +63,6 @@ struct SuggestionView: View {
 
     var body: some View {
         List {
-            if featureFlags.mealsOwnershipRules, !members.isEmpty {
-                Section("Ownership Rules") {
-                    ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
-                        HStack {
-                            Text(day.localizedName)
-                            Spacer()
-                            Picker(day.localizedName, selection: ownershipRuleBinding(for: day)) {
-                                Text("Unassigned").tag(ResponsibleSelection.unassigned)
-                                ForEach(members) { user in
-                                    Text(user.name).tag(ResponsibleSelection.user(user.id))
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .accessibilityIdentifier("ownership-rule-\(day.rawValue)")
-                        }
-                    }
-                    Text("Rule changes update meals without a saved assignment.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             ForEach(sortedSlots) { slot in
                 VStack(alignment: .leading, spacing: 12) {
                     if let suggestion = savedSuggestion(for: slot) {
@@ -125,10 +102,34 @@ struct SuggestionView: View {
                 }
                 .padding(.vertical, 8)
             }
+
+            if featureFlags.mealsOwnershipRules, !members.isEmpty {
+                Section("Ownership Rules") {
+                    Text("These defaults apply to meals without a saved assignment.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
+                        HStack {
+                            Text(day.localizedName)
+                            Spacer()
+                            Picker(day.localizedName, selection: ownershipRuleBinding(for: day)) {
+                                Text("Unassigned").tag(ResponsibleSelection.unassigned)
+                                ForEach(members) { user in
+                                    Text(user.name).tag(ResponsibleSelection.user(user.id))
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .accessibilityIdentifier("ownership-rule-\(day.rawValue)")
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Suggestions")
         .toolbar {
-            Button("Save Suggestion") {
+            Button("Save Changes") {
                 _ = saveSuggestions(requireAllFilled: false)
             }
             Button("Submit for Review") {

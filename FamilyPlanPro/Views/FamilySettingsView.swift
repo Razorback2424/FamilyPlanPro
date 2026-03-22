@@ -24,14 +24,14 @@ struct FamilySettingsView: View {
 
     var body: some View {
         Form {
-            Section("Family Details") {
-                TextField("Family Name", text: $family.name)
+            Section("Household") {
+                TextField("Household name", text: $family.name)
                     .textInputAutocapitalization(.words)
             }
 
             Section("Members") {
                 if family.members.isEmpty {
-                    ContentUnavailableView("No Members", systemImage: "person.3", description: Text("Add the people in your household so you can assign meal responsibilities."))
+                    ContentUnavailableView("No household members yet", systemImage: "person.3", description: Text("Add the people in your household so the planner can assign meals cleanly."))
                 } else {
                     ForEach(sortedMembers) { member in
                         Text(member.name)
@@ -40,21 +40,21 @@ struct FamilySettingsView: View {
                 }
 
                 HStack {
-                    TextField("Add Member", text: $newMemberName)
+                    TextField("New member name", text: $newMemberName)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
                         .focused($isAddingMember)
 
-                    Button("Add") {
+                    Button("Add member") {
                         addMember()
                     }
                     .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
 
-            Section("Weekday Default Owners") {
+            Section("Default weekday owners") {
                 if sortedMembers.isEmpty {
-                    Text("Add household members to set default meal owners for new weeks.")
+                    Text("Add household members to set up the default meal owner for each day.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(DayOfWeek.allCases, id: \.rawValue) { day in
@@ -65,6 +65,9 @@ struct FamilySettingsView: View {
                         }
                     }
                 }
+                Text("These defaults guide the first set of meal suggestions when a new week starts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Family Settings")

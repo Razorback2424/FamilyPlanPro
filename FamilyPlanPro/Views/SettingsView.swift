@@ -49,48 +49,48 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Household") {
+            Section("Household members") {
                 if let userA {
-                    TextField("Partner A", text: Binding(
+                    TextField("Primary member", text: Binding(
                         get: { userA.name },
                         set: { userA.name = $0 }
                     ))
                 } else {
-                    Text("Partner A")
+                    Text("Primary member")
                         .foregroundStyle(.secondary)
                 }
 
                 if let userB {
-                    TextField("Partner B", text: Binding(
+                    TextField("Secondary member", text: Binding(
                         get: { userB.name },
                         set: { userB.name = $0 }
                     ))
                 } else {
-                    Text("Partner B")
+                    Text("Secondary member")
                         .foregroundStyle(.secondary)
                 }
 
-                Button("Save Changes") {
+                Button("Save household names") {
                     try? context.save()
                 }
             }
 
             if featureFlags.mealsBudgetStatus, let plan = currentPlan {
                 Section("Budget") {
-                    TextField("Weekly budget ($)", text: $budgetTarget)
+                    TextField("Weekly budget", text: $budgetTarget)
                         .keyboardType(.numberPad)
-                    TextField("Observed spend ($)", text: $observedSpend)
+                    TextField("Planned spend", text: $observedSpend)
                         .keyboardType(.numberPad)
                         .disabled(!canEditObservedSpend)
                     if !canEditObservedSpend {
-                        Text("Finalize meals to create a grocery list before entering observed spend.")
+                        Text("Finish the week's meals to create a grocery list before entering spend.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Text("Status: \(plan.budgetStatus.rawValue.capitalized)")
+                    Text("Budget status: \(plan.budgetStatus.rawValue.capitalized)")
                         .font(.caption)
                         .foregroundStyle(budgetStatusColor)
-                    Button("Update Budget") {
+                    Button("Save budget") {
                         let manager = DataManager(context: context, flags: featureFlags)
                         let targetValue = Int(budgetTarget) ?? 0
                         let observedValue = Int(observedSpend) ?? 0

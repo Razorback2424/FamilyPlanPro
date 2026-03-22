@@ -4,16 +4,23 @@ final class GroceryCadenceScheduler {
     private let scheduler: NotificationScheduler
     private let calendar: Calendar
     private let now: () -> Date
+    private let processInfo: ProcessInfo
 
     init(scheduler: NotificationScheduler,
          calendar: Calendar = .current,
-         now: @escaping () -> Date = Date.init) {
+         now: @escaping () -> Date = Date.init,
+         processInfo: ProcessInfo = .processInfo) {
         self.scheduler = scheduler
         self.calendar = calendar
         self.now = now
+        self.processInfo = processInfo
     }
 
     func scheduleNudges(weekStart: Date, weekId: String) {
+        guard !isDebugScreenshotRoute else {
+            cancelNudges(weekId: weekId)
+            return
+        }
         let sunday = calendar.startOfDay(for: weekStart)
         let thursday = calendar.date(byAdding: .day, value: 4, to: sunday)
         let currentDate = now()
@@ -31,5 +38,10 @@ final class GroceryCadenceScheduler {
 
     func cancelNudges(weekId: String) {
         scheduler.cancel(ids: ["grocery-\(weekId)-sun", "grocery-\(weekId)-thu"])
+    }
+
+    private var isDebugScreenshotRoute: Bool {
+        let arguments = processInfo.arguments
+        return arguments.contains("-ui_debug_route") || processInfo.environment["UI_DEBUG_ROUTE"] != nil
     }
 }

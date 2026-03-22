@@ -1,0 +1,9 @@
+{
+  "scheme": "FamilyPlanPro",
+  "bundle_id": "Kellers-In-Colorado.FamilyPlanPro",
+  "route": "conflict",
+  "simulator_udid": "B482A2AC-6D16-494E-A100-03B30F183927",
+  "simulator_name": "booted-or-default",
+  "screenshot": "/Users/seankeller/Documents/FamilyPlanPro/artifacts/ui-latest.png",
+  "build_log": "/Users/seankeller/Documents/FamilyPlanPro/artifacts/ui-build.log"
+}
